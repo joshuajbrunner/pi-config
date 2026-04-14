@@ -14,7 +14,7 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 const SYSTEM_PROMPT_LOG = "system-prompts.jsonl";
 const MAX_LOG_ENTRIES = 50;
@@ -25,13 +25,19 @@ interface SystemPromptEntry {
 	systemPrompt: string;
 }
 
+function getSessionDataDir(sessionFile: string): string {
+	const sessionDir = dirname(sessionFile);
+	const sessionName = basename(sessionFile, ".jsonl");
+	return join(sessionDir, sessionName);
+}
+
 async function logSystemPrompt(
 	sessionFile: string,
 	model: string,
 	system: any
 ): Promise<void> {
-	const sessionDir = dirname(sessionFile);
-	const logFile = join(sessionDir, SYSTEM_PROMPT_LOG);
+	const sessionDataDir = getSessionDataDir(sessionFile);
+	const logFile = join(sessionDataDir, SYSTEM_PROMPT_LOG);
 
 	// Build system prompt string from blocks or string
 	let systemPrompt: string;
@@ -68,13 +74,13 @@ async function logSystemPrompt(
 	}
 
 	// Write back
-	await mkdir(sessionDir, { recursive: true });
+	await mkdir(sessionDataDir, { recursive: true });
 	await writeFile(logFile, lines.join("\n") + "\n");
 }
 
 async function readSystemPrompts(sessionFile: string): Promise<SystemPromptEntry[]> {
-	const sessionDir = dirname(sessionFile);
-	const logFile = join(sessionDir, SYSTEM_PROMPT_LOG);
+	const sessionDataDir = getSessionDataDir(sessionFile);
+	const logFile = join(sessionDataDir, SYSTEM_PROMPT_LOG);
 
 	try {
 		const content = await readFile(logFile, "utf8");
