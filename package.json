@@ -1,0 +1,12 @@
+{
+  "name": "pi-skills",
+  "version": "1.0.0",
+  "description": "Personal pi skills and extensions",
+  "keywords": ["pi-package"],
+  "pi": {
+    "extensions": ["./extensions"],
+    "skills": ["./skills"],
+    "prompts": ["./prompts"],
+    "themes": ["./themes"]
+  }
+}
