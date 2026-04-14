@@ -1,11 +1,11 @@
-# Pi Skills
+# Pi Config
 
 Personal collection of pi skills and extensions.
 
 ## Installation
 
 ```bash
-pi install git:github.com/joshuabrunner/pi-skills
+pi install git:github.com/joshuajbrunner/pi-config
 ```
 
 ## Skills
