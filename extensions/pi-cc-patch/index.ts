@@ -13,6 +13,82 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
+
+const SYSTEM_PROMPT_LOG = "system-prompts.jsonl";
+const MAX_LOG_ENTRIES = 50;
+
+interface SystemPromptEntry {
+	timestamp: string;
+	model: string;
+	systemPrompt: string;
+}
+
+async function logSystemPrompt(
+	sessionFile: string,
+	model: string,
+	system: any
+): Promise<void> {
+	const sessionDir = dirname(sessionFile);
+	const logFile = join(sessionDir, SYSTEM_PROMPT_LOG);
+
+	// Build system prompt string from blocks or string
+	let systemPrompt: string;
+	if (Array.isArray(system)) {
+		systemPrompt = system
+			.filter((b: any) => b.type === "text" && b.text)
+			.map((b: any) => b.text)
+			.join("\n\n");
+	} else if (typeof system === "string") {
+		systemPrompt = system;
+	} else {
+		return;
+	}
+
+	const entry: SystemPromptEntry = {
+		timestamp: new Date().toISOString(),
+		model,
+		systemPrompt,
+	};
+
+	// Read existing entries
+	let lines: string[] = [];
+	try {
+		const content = await readFile(logFile, "utf8");
+		lines = content.trim().split("\n").filter(Boolean);
+	} catch {
+		// File doesn't exist yet
+	}
+
+	// Append new entry and keep only last N
+	lines.push(JSON.stringify(entry));
+	if (lines.length > MAX_LOG_ENTRIES) {
+		lines = lines.slice(-MAX_LOG_ENTRIES);
+	}
+
+	// Write back
+	await mkdir(sessionDir, { recursive: true });
+	await writeFile(logFile, lines.join("\n") + "\n");
+}
+
+async function readSystemPrompts(sessionFile: string): Promise<SystemPromptEntry[]> {
+	const sessionDir = dirname(sessionFile);
+	const logFile = join(sessionDir, SYSTEM_PROMPT_LOG);
+
+	try {
+		const content = await readFile(logFile, "utf8");
+		const lines = content.trim().split("\n").filter(Boolean);
+		return lines.map((line) => JSON.parse(line) as SystemPromptEntry);
+	} catch {
+		return [];
+	}
+}
+
+function formatTimestamp(iso: string): string {
+	const date = new Date(iso);
+	return date.toLocaleString();
+}
 
 function sanitizeSystemPrompt(text: string): string {
 	return text
@@ -31,7 +107,7 @@ function sanitizeSystemPrompt(text: string): string {
 }
 
 export default function (pi: ExtensionAPI) {
-	pi.on("before_provider_request", async (event, _ctx) => {
+	pi.on("before_provider_request", async (event, ctx) => {
 		const payload = event.payload as Record<string, any>;
 		if (!payload || typeof payload !== "object") return;
 		if (typeof payload.model !== "string") return;
@@ -68,10 +144,55 @@ export default function (pi: ExtensionAPI) {
 			};
 		}
 
+		// Log the sanitized system prompt
+		const sessionFile = ctx.sessionManager.getSessionFile();
+		if (sessionFile) {
+			try {
+				await logSystemPrompt(sessionFile, payload.model, payload.system);
+			} catch {
+				// Ignore logging errors
+			}
+		}
+
 		return payload;
 	});
 
 	pi.on("session_start", async (_e, ctx) => {
 		ctx.ui.notify("cc-patch: prompt sanitization active", "info");
+	});
+
+	// Command to view logged system prompts
+	pi.registerCommand("debug-system-prompts", {
+		description: "View logged system prompts for this session",
+		handler: async (_args, ctx) => {
+			const sessionFile = ctx.sessionManager.getSessionFile();
+			if (!sessionFile) {
+				ctx.ui.notify("No session file (ephemeral mode)", "warning");
+				return;
+			}
+
+			const entries = await readSystemPrompts(sessionFile);
+			if (entries.length === 0) {
+				ctx.ui.notify("No system prompts logged yet", "info");
+				return;
+			}
+
+			// Build selection items (most recent first)
+			const reversedEntries = [...entries].reverse();
+			const items = reversedEntries.map(
+				(e) => `${formatTimestamp(e.timestamp)} - ${e.model}`
+			);
+
+			const selected = await ctx.ui.select("System Prompts (newest first)", items);
+			if (selected) {
+				const index = items.indexOf(selected);
+				const entry = reversedEntries[index];
+				// Display in editor for scrollable viewing
+				await ctx.ui.editor(
+					`System Prompt - ${entry.model}`,
+					entry.systemPrompt
+				);
+			}
+		},
 	});
 }
