@@ -96,6 +96,22 @@ function formatTimestamp(iso: string): string {
 	return date.toLocaleString();
 }
 
+function isAnthropicTarget(
+	payload: Record<string, any>,
+	model: { provider?: string; id?: string } | undefined,
+): boolean {
+	const provider = typeof model?.provider === "string" ? model.provider.toLowerCase() : "";
+	const modelId = typeof model?.id === "string" ? model.id.toLowerCase() : "";
+	const payloadModel = typeof payload.model === "string" ? payload.model.toLowerCase() : "";
+
+	return (
+		provider.includes("anthropic") ||
+		modelId.includes("claude") ||
+		payloadModel.includes("anthropic") ||
+		payloadModel.includes("claude")
+	);
+}
+
 function sanitizeSystemPrompt(text: string): string {
 	return text
 		.replace(/operating inside pi, a coding agent harness\./g, "operating as a coding assistant.")
@@ -116,8 +132,8 @@ export default function (pi: ExtensionAPI) {
 	pi.on("before_provider_request", async (event, ctx) => {
 		const payload = event.payload as Record<string, any>;
 		if (!payload || typeof payload !== "object") return;
-		if (typeof payload.model !== "string") return;
 		if (!Array.isArray(payload.messages)) return;
+		if (!isAnthropicTarget(payload, ctx.model as { provider?: string; id?: string } | undefined)) return;
 
 		if (Array.isArray(payload.system)) {
 			const newBlocks: any[] = [];
@@ -164,7 +180,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (_e, ctx) => {
-		ctx.ui.notify("cc-patch: prompt sanitization active", "info");
+		ctx.ui.notify("cc-patch: loaded (anthropic-only)", "info");
 	});
 
 	// Command to view logged system prompts
