@@ -251,8 +251,8 @@ export default function (pi: ExtensionAPI) {
 
 	// Command to view logged system prompts
 	pi.registerCommand("debug-system-prompts", {
-		description: "View logged system prompts for this session",
-		handler: async (_args, ctx) => {
+		description: "View logged system prompts for this session. Usage: /debug-system-prompts [limit]",
+		handler: async (args, ctx) => {
 			const sessionFile = ctx.sessionManager.getSessionFile();
 			if (!sessionFile) {
 				ctx.ui.notify("No session file (ephemeral mode)", "warning");
@@ -265,13 +265,20 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			// Build selection items (most recent first)
-			const reversedEntries = [...entries].reverse();
+			// Parse optional limit argument (default: 10)
+			const limit = args.trim() ? parseInt(args.trim(), 10) : 10;
+			const displayLimit = isNaN(limit) || limit <= 0 ? 10 : limit;
+
+			// Build selection items (most recent first, limited)
+			const reversedEntries = [...entries].reverse().slice(0, displayLimit);
 			const items = reversedEntries.map(
 				(e) => `${formatTimestamp(e.timestamp)} - ${e.model}`
 			);
 
-			const selected = await ctx.ui.select("System Prompts (newest first)", items);
+			const title = entries.length > displayLimit
+				? `System Prompts (${displayLimit} of ${entries.length}, newest first)`
+				: `System Prompts (${entries.length} total, newest first)`;
+			const selected = await ctx.ui.select(title, items);
 			if (selected) {
 				const index = items.indexOf(selected);
 				const entry = reversedEntries[index];
