@@ -35,12 +35,14 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 | Extension | Description |
 |-----------|-------------|
 | `pi-cc-patch` | Patches requests for Claude Pro/Max subscription compatibility |
+| `policy-self-heal` | Detects provider policy false-positive errors and queues a safe recovery prompt |
 
 ### Commands
 
 | Command | Description |
 |---------|-------------|
 | `/debug-system-prompts` | View logged system prompts for the current session |
+| `/policy-self-heal` | Manage policy error self-healing and inspect the last detected event |
 
 ## Usage
 
