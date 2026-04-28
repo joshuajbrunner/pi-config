@@ -35,8 +35,8 @@ interface ExtensionState {
 }
 
 const state: ExtensionState = {
-	enabled: true,
-	autoRecover: true,
+	enabled: false,
+	autoRecover: false,
 	recoveriesThisAgent: 0,
 	lastFingerprint: undefined,
 	lastRecord: undefined,
@@ -313,20 +313,20 @@ function formatLastRecord(record: RecoveryRecord | undefined): string {
 
 export default function (pi: ExtensionAPI) {
 	pi.registerFlag("policy-self-heal", {
-		description: "Enable policy error self-healing prompts (default: true)",
+		description: "Enable policy error self-healing prompts (default: false)",
 		type: "boolean",
-		default: true,
+		default: false,
 	});
 
 	pi.registerFlag("policy-self-heal-auto", {
-		description: "Automatically queue a safe recovery prompt when policy errors are detected (default: true)",
+		description: "Automatically queue a safe recovery prompt when policy errors are detected (default: false)",
 		type: "boolean",
-		default: true,
+		default: false,
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
-		state.enabled = pi.getFlag("policy-self-heal") !== false;
-		state.autoRecover = pi.getFlag("policy-self-heal-auto") !== false;
+		state.enabled = pi.getFlag("policy-self-heal") === true;
+		state.autoRecover = pi.getFlag("policy-self-heal-auto") === true;
 		state.recoveriesThisAgent = 0;
 		state.lastProviderStatus = undefined;
 		ctx.ui.setStatus(EXTENSION_NAME, state.enabled ? (state.autoRecover ? "heal:auto" : "heal:watch") : undefined);
@@ -368,6 +368,18 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerCommand("policy-self-heal", {
 		description: "Manage policy error self-healing. Usage: /policy-self-heal [on|off|auto-on|auto-off|status|last]",
+		getArgumentCompletions: (prefix: string) => {
+			const options = [
+				{ value: "on", label: "on", description: "Enable self-healing" },
+				{ value: "off", label: "off", description: "Disable self-healing" },
+				{ value: "auto-on", label: "auto-on", description: "Enable automatic recovery prompts" },
+				{ value: "auto-off", label: "auto-off", description: "Disable automatic recovery (watch only)" },
+				{ value: "status", label: "status", description: "Show current status" },
+				{ value: "last", label: "last", description: "View last policy event" },
+			];
+			const filtered = options.filter((o) => o.value.startsWith(prefix.toLowerCase()));
+			return filtered.length > 0 ? filtered : null;
+		},
 		handler: async (args, ctx) => {
 			const arg = args.trim().toLowerCase();
 
