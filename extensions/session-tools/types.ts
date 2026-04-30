@@ -16,3 +16,5 @@ export type SavedSummary = {
 	path: string;
 	content: string;
 };
+
+export type SummaryDebugLogger = (message: string, details?: unknown) => Promise<void>;

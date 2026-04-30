@@ -1,5 +1,5 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { SUMMARY_FILE_EXTENSION, SUMMARY_FILE_PREFIX } from "./config";
 import type { SavedSummary } from "./types";
@@ -19,16 +19,35 @@ function timestampForFile(date = new Date()): string {
 	return date.toISOString().replaceAll(":", "-").replaceAll(".", "-");
 }
 
+export async function ensureSummaryDirForCurrentSession(ctx: ExtensionContext): Promise<string | undefined> {
+	const dir = currentSessionSummaryDir(ctx);
+	if (!dir) return undefined;
+
+	await mkdir(dir, { recursive: true });
+	return dir;
+}
+
+export async function appendSummaryDebugLog(ctx: ExtensionContext, message: string, details?: unknown): Promise<void> {
+	const dir = await ensureSummaryDirForCurrentSession(ctx);
+	if (!dir) return;
+
+	const line = JSON.stringify({
+		timestamp: new Date().toISOString(),
+		message,
+		details,
+	}) + "\n";
+
+	await appendFile(path.join(dir, "debug.jsonl"), line, "utf8");
+}
+
 export async function saveSummaryForCurrentSession(
 	ctx: ExtensionContext,
 	summary: string,
 	customInstruction?: string,
 ): Promise<string | undefined> {
-	const dir = currentSessionSummaryDir(ctx);
+	const dir = await ensureSummaryDirForCurrentSession(ctx);
 	const sessionFile = ctx.sessionManager.getSessionFile();
 	if (!dir || !sessionFile) return undefined;
-
-	await mkdir(dir, { recursive: true });
 
 	const filePath = path.join(dir, `${SUMMARY_FILE_PREFIX}${timestampForFile()}${SUMMARY_FILE_EXTENSION}`);
 	const content = [

@@ -20,7 +20,7 @@ Summaries are saved beside the session JSONL file in a folder named with the ses
 ~/.pi/agent/sessions/<cwd-dir>/<session-id>/summary-<timestamp>.md
 ```
 
-Existing summaries are never overwritten.
+Existing summaries are never overwritten. `/summarize` creates the session-id directory immediately and appends debug events to `debug.jsonl` in that directory.
 
 ## Model
 
