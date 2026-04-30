@@ -67,12 +67,14 @@ describe("SessionBrowserComponent", () => {
 
 	it("renders detail mode within width", () => {
 		const { component } = createComponent([
-			session({ parsedSummary: { short: "Short", full: "Full ".repeat(100) }, latestSummaryPath: "/tmp/summary.md" }),
+			session({ firstMessage: "Initial user request", parsedSummary: { short: "Short", full: "Full summary" }, latestSummaryPath: "/tmp/summary.md" }),
 		]);
 		component.handleInput("d");
 		const lines = component.render(60);
 		expect(lines.join("\n")).toContain("Session Detail");
 		expect(lines.join("\n")).toContain("Full Summary");
+		expect(lines.join("\n")).toContain("First Message");
+		expect(lines.join("\n")).toContain("Initial user request");
 		expectWidths(lines, 60);
 	});
 

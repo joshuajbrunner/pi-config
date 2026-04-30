@@ -54,6 +54,9 @@ function fullDetailText(session: BrowserSession): string {
 	parts.push("Full Summary");
 	parts.push(session.parsedSummary?.full || "No full summary saved for this session.");
 	parts.push("");
+	parts.push("First Message");
+	parts.push(session.firstMessage || "No first message recorded.");
+	parts.push("");
 	parts.push("Metadata");
 	parts.push(`Modified: ${session.modified.toLocaleString()}`);
 	parts.push(`Session: ${formatPath(session.path)}`);
