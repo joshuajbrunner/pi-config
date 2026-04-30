@@ -3,19 +3,7 @@ import { buildConversationText } from "./conversation-extract";
 import { createSummary } from "./summary-model";
 import { appendSummaryDebugLog, ensureSummaryDirForCurrentSession, saveSummaryForCurrentSession } from "./summary-store";
 import { showSummaryUi } from "./summary-ui";
-import type { SummaryMode } from "./types";
-
-function parseSummarizeArgs(args: string): { mode: SummaryMode; customInstruction?: string } {
-	const trimmed = args.trim();
-	if (!trimmed) return { mode: "short" };
-
-	const [first, ...rest] = trimmed.split(/\s+/);
-	if (first?.toLowerCase() === "full") {
-		return { mode: "full", customInstruction: rest.join(" ").trim() || undefined };
-	}
-
-	return { mode: "short", customInstruction: trimmed };
-}
+import { parseSummarizeArgs } from "./summarize-args";
 
 export function registerSummarizeCommand(pi: ExtensionAPI): void {
 	pi.registerCommand("summarize", {

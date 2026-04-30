@@ -13,16 +13,21 @@ function firstContentLine(markdown: string): string {
 	return markdown
 		.split("\n")
 		.map((line) => line.trim())
-		.find((line) => line.length > 0 && !line.startsWith("#")) ?? "No summary available";
+		.find((line) => line.length > 0 && !line.startsWith("#") && !/^short summary\s*:?$/i.test(line) && !/^full summary\s*:?$/i.test(line)) ?? "No summary available";
+}
+
+function section(markdown: string, heading: string): string | undefined {
+	const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const pattern = new RegExp(`(?:^|\\n)(?:#{1,6}\\s*)?${escaped}\\s*:?\\s*\\n+([\\s\\S]*?)(?=\\n(?:#{1,6}\\s*)?(?:Short Summary|Full Summary)\\s*:?\\s*(?:\\n|$)|$)`, "i");
+	return markdown.match(pattern)?.[1]?.trim();
 }
 
 export function parseSummary(markdown: string): ParsedSummary {
 	const body = stripFrontmatter(markdown);
-	const shortMatch = body.match(/## Short Summary\s*\n+([\s\S]*?)(?=\n## |$)/i);
-	const fullMatch = body.match(/## Full Summary\s*\n+([\s\S]*?)(?=\n## |$)/i);
-
-	const short = shortMatch?.[1]?.trim().split("\n")[0]?.trim() || firstContentLine(body);
-	const full = fullMatch?.[1]?.trim();
+	const inlineShort = body.match(/(?:^|\n)short summary\s*:\s*(.+)/i)?.[1]?.trim();
+	const shortSection = section(body, "Short Summary");
+	const full = section(body, "Full Summary");
+	const short = inlineShort || shortSection?.split("\n").find((line) => line.trim())?.trim() || firstContentLine(body);
 
 	return { short, full };
 }

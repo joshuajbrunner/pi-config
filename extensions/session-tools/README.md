@@ -13,6 +13,10 @@ Adds session summary and browsing commands.
 /session-browser all
 ```
 
+## Session browser
+
+`/session-browser` opens a centered floating overlay. It lists sessions by saved short summary when available, supports type-to-filter search, and opens a detail view with `d` for full summaries and metadata. Use `j/k` or arrow keys to move, `ctrl+u/d` or `fn+up/down` to page, `enter` to resume, and `esc` to cancel.
+
 ## Summary storage
 
 Summaries are saved beside the session JSONL file in a folder named with the session id:

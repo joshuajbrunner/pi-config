@@ -2,7 +2,7 @@ import { SessionManager, type ExtensionAPI, type SessionInfo } from "@mariozechn
 import { parseSummary } from "./summary-parse";
 import { loadLatestSummary } from "./summary-store";
 import { showSummaryUi } from "./summary-ui";
-import { chooseSession } from "./session-browser-ui";
+import { SessionBrowserComponent, type SessionBrowserResult } from "./session-browser-component";
 import type { BrowserSession } from "./types";
 
 async function withSummaries(sessions: SessionInfo[]): Promise<BrowserSession[]> {
@@ -46,14 +46,17 @@ export function registerSessionBrowserCommand(pi: ExtensionAPI): void {
 					(a, b) => b.modified.getTime() - a.modified.getTime(),
 				);
 
-				const selected = await chooseSession(sessions, ctx);
+				const selected = await ctx.ui.custom<SessionBrowserResult>(
+					(tui, theme, _kb, done) => new SessionBrowserComponent(tui, theme, sessions, done),
+					{ overlay: true, overlayOptions: { anchor: "center", width: 84, maxHeight: "80%" } },
+				);
 				if (!selected) return;
 
-				const result = await ctx.switchSession(selected.path, {
+				const result = await ctx.switchSession(selected.session.path, {
 					withSession: async (newCtx) => {
 						newCtx.ui.notify("Session restored", "success");
 
-						const savedSummary = await loadLatestSummary(selected.path, selected.id);
+						const savedSummary = await loadLatestSummary(selected.session.path, selected.session.id);
 						if (savedSummary) {
 							await showSummaryUi("Latest Session Summary", savedSummary.content, newCtx);
 						}
