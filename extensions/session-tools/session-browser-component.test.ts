@@ -61,6 +61,7 @@ describe("SessionBrowserComponent", () => {
 			session({ parsedSummary: { short: "alpha work" } }),
 			session({ parsedSummary: { short: "beta work" } }),
 		]);
+		component.handleInput("/");
 		component.handleInput("b");
 		const lines = component.render(84).join("\n");
 		expect(lines).toContain("beta work");

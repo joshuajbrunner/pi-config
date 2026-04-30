@@ -107,6 +107,7 @@ export class SessionBrowserComponent implements Component {
 	private scrollOffset = 0;
 	private detailScrollOffset = 0;
 	private filterQuery = "";
+	private searchMode = false;
 	private width = MAX_WIDTH;
 	private busy = false;
 	private statusMessage: { type: "info" | "success" | "error"; text: string } | undefined;
@@ -156,8 +157,10 @@ export class SessionBrowserComponent implements Component {
 		lines.push(row("", width, theme));
 
 		const cursor = theme.fg("accent", "│");
-		const placeholder = theme.fg("dim", "type to filter...");
-		const query = this.filterQuery ? `${this.filterQuery}${cursor}` : `${cursor}${placeholder}`;
+		const placeholder = theme.fg("dim", this.searchMode ? "type to filter..." : "press / to search");
+		const query = this.filterQuery
+			? this.searchMode ? `${this.filterQuery}${cursor}` : this.filterQuery
+			: this.searchMode ? `${cursor}${placeholder}` : placeholder;
 		lines.push(row(` Search: ${query}`, width, theme));
 		lines.push(row("", width, theme));
 
@@ -189,7 +192,7 @@ export class SessionBrowserComponent implements Component {
 		const info = this.statusMessage?.text || fallbackInfo;
 		lines.push(row(` ${theme.fg(statusColor, truncateToWidth(info.replace(/[\r\n]+/g, " "), width - 4))}`, width, theme));
 		lines.push(row("", width, theme));
-		lines.push(renderFooter(" [enter] resume  [d] detail  [s] summarize  [S] full  [esc] close ", width, theme));
+		lines.push(renderFooter(" [enter] resume  [/] search  [d] detail  [s] summarize  [S] full  [esc] close ", width, theme));
 		return lines;
 	}
 
@@ -250,6 +253,24 @@ export class SessionBrowserComponent implements Component {
 			this.done(session ? { session } : undefined);
 			return;
 		}
+		// Search mode handling
+		if (this.searchMode) {
+			if (matchesKey(data, "escape") || matchesKey(data, "return")) {
+				this.searchMode = false;
+			} else if (matchesKey(data, "backspace")) {
+				this.filterQuery = this.filterQuery.slice(0, -1);
+				this.cursor = 0;
+				this.scrollOffset = 0;
+			} else if (data.length === 1 && data.charCodeAt(0) >= 32) {
+				this.filterQuery += data;
+				this.cursor = 0;
+				this.scrollOffset = 0;
+			}
+			this.clamp();
+			this.tui.requestRender();
+			return;
+		}
+
 		if (data === "s" || data === "S") {
 			void this.summarizeSelected(data === "S" ? "full" : "short");
 			return;
@@ -267,7 +288,10 @@ export class SessionBrowserComponent implements Component {
 			return;
 		}
 
-		if (matchesKey(data, "up") || data === "k") this.cursor = Math.max(0, this.cursor - 1);
+		// List mode navigation
+		if (data === "/") {
+			this.searchMode = true;
+		} else if (matchesKey(data, "up") || data === "k") this.cursor = Math.max(0, this.cursor - 1);
 		else if (matchesKey(data, "down") || data === "j") this.cursor = Math.min(Math.max(0, visible.length - 1), this.cursor + 1);
 		else if (matchesKey(data, "pageUp") || data === "\u0015") this.cursor = Math.max(0, this.cursor - LIST_VIEWPORT_HEIGHT);
 		else if (matchesKey(data, "pageDown") || data === "\u0004") this.cursor = Math.min(Math.max(0, visible.length - 1), this.cursor + LIST_VIEWPORT_HEIGHT);
@@ -276,10 +300,6 @@ export class SessionBrowserComponent implements Component {
 			this.detailScrollOffset = 0;
 		} else if (matchesKey(data, "backspace")) {
 			this.filterQuery = this.filterQuery.slice(0, -1);
-			this.cursor = 0;
-			this.scrollOffset = 0;
-		} else if (data.length === 1 && data.charCodeAt(0) >= 32 && data !== "d") {
-			this.filterQuery += data;
 			this.cursor = 0;
 			this.scrollOffset = 0;
 		}
