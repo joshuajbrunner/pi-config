@@ -28,37 +28,43 @@ export function registerSessionBrowserCommand(pi: ExtensionAPI): void {
 	pi.registerCommand("session-browser", {
 		description: "Browse sessions with saved summary previews and resume the selected session",
 		handler: async (args, ctx) => {
-			await ctx.waitForIdle();
+			try {
+				await ctx.waitForIdle();
 
-			ctx.ui.notify("Loading sessions...", "info");
+				ctx.ui.notify("Loading sessions...", "info");
 
-			const listAll = shouldListAll(args);
-			const sessionInfos = listAll ? await SessionManager.listAll() : await SessionManager.list(ctx.cwd);
-			if (sessionInfos.length === 0) {
-				ctx.ui.notify("No sessions found", "warning");
-				return;
-			}
+				const listAll = shouldListAll(args);
+				const sessionInfos = listAll ? await SessionManager.listAll() : await SessionManager.list(ctx.cwd);
+				if (sessionInfos.length === 0) {
+					ctx.ui.notify("No sessions found", "warning");
+					return;
+				}
 
-			const sessions = (await withSummaries(sessionInfos)).sort(
-				(a, b) => b.modified.getTime() - a.modified.getTime(),
-			);
+				const sessions = (await withSummaries(sessionInfos)).sort(
+					(a, b) => b.modified.getTime() - a.modified.getTime(),
+				);
 
-			const selected = await chooseSession(sessions, ctx);
-			if (!selected) return;
+				const selected = await chooseSession(sessions, ctx);
+				if (!selected) return;
 
-			const result = await ctx.switchSession(selected.path, {
-				withSession: async (newCtx) => {
-					newCtx.ui.notify("Session restored", "success");
+				const result = await ctx.switchSession(selected.path, {
+					withSession: async (newCtx) => {
+						newCtx.ui.notify("Session restored", "success");
 
-					const savedSummary = await loadLatestSummary(selected.path, selected.id);
-					if (savedSummary) {
-						await showSummaryUi("Latest Session Summary", savedSummary.content, newCtx);
-					}
-				},
-			});
+						const savedSummary = await loadLatestSummary(selected.path, selected.id);
+						if (savedSummary) {
+							await showSummaryUi("Latest Session Summary", savedSummary.content, newCtx);
+						}
+					},
+				});
 
-			if (result.cancelled) {
-				ctx.ui.notify("Session switch cancelled", "warning");
+				if (result.cancelled) {
+					ctx.ui.notify("Session switch cancelled", "warning");
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.stack || error.message : String(error);
+				ctx.ui.notify("Session browser failed", "error");
+				await showSummaryUi("Session Browser Failed", `\`\`\`\n${message}\n\`\`\``, ctx);
 			}
 		},
 	});

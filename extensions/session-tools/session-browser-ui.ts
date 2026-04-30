@@ -88,9 +88,9 @@ function renderBrowser(sessions: BrowserSession[], selected: number, previewScro
 	}
 
 	lines.push("");
-	lines.push(theme.fg("dim", `Selected: ${selectedSession.path}`));
+	lines.push(theme.fg("dim", truncate(`Selected: ${selectedSession.path}`, width)));
 	if (selectedSession.latestSummaryPath) {
-		lines.push(theme.fg("dim", `Summary:  ${selectedSession.latestSummaryPath}`));
+		lines.push(theme.fg("dim", truncate(`Summary:  ${selectedSession.latestSummaryPath}`, width)));
 	}
 	return lines;
 }
