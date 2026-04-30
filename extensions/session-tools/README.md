@@ -24,4 +24,4 @@ Existing summaries are never overwritten.
 
 ## Model
 
-Summarization uses `openai-codex/gpt-5.5` via pi's current model registry/auth flow. Gemini is intentionally not used.
+Summarization first tries `openai-codex/gpt-5.5`, then falls back to `anthropic/claude-sonnet-4-5` via pi's current model registry/auth flow. Gemini is intentionally not used.
