@@ -73,7 +73,7 @@ function renderBrowser(
 
 	const lines: string[] = [];
 	lines.push(theme.fg("accent", theme.bold("Session Browser")));
-	lines.push(theme.fg("dim", "↑/↓ or j/k: move  ctrl+u/ctrl+d or fn+↑/fn+↓: scroll summary  t: toggle short/full  Enter: resume  Esc: cancel"));
+	lines.push(theme.fg("dim", truncate("j/k move | ctrl+u/d or fn+up/down scroll | t toggle | enter resume | esc cancel", width)));
 	lines.push("");
 	lines.push(`${theme.bold("Sessions").padEnd(leftWidth)} │ ${theme.bold(`Latest Summary (${previewMode})`)}`);
 	lines.push(`${"─".repeat(leftWidth)} │ ${"─".repeat(rightWidth)}`);
