@@ -1,0 +1,78 @@
+import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { SUMMARY_FILE_EXTENSION, SUMMARY_FILE_PREFIX } from "./config";
+import type { SavedSummary } from "./types";
+
+export function summaryDirForSession(sessionFile: string, sessionId: string): string {
+	return path.join(path.dirname(sessionFile), sessionId);
+}
+
+export function currentSessionSummaryDir(ctx: ExtensionContext): string | undefined {
+	const sessionFile = ctx.sessionManager.getSessionFile();
+	if (!sessionFile) return undefined;
+
+	return summaryDirForSession(sessionFile, ctx.sessionManager.getSessionId());
+}
+
+function timestampForFile(date = new Date()): string {
+	return date.toISOString().replaceAll(":", "-").replaceAll(".", "-");
+}
+
+export async function saveSummaryForCurrentSession(
+	ctx: ExtensionContext,
+	summary: string,
+	customInstruction?: string,
+): Promise<string | undefined> {
+	const dir = currentSessionSummaryDir(ctx);
+	const sessionFile = ctx.sessionManager.getSessionFile();
+	if (!dir || !sessionFile) return undefined;
+
+	await mkdir(dir, { recursive: true });
+
+	const filePath = path.join(dir, `${SUMMARY_FILE_PREFIX}${timestampForFile()}${SUMMARY_FILE_EXTENSION}`);
+	const content = [
+		"---",
+		`sessionId: ${ctx.sessionManager.getSessionId()}`,
+		`sessionFile: ${JSON.stringify(sessionFile)}`,
+		`createdAt: ${new Date().toISOString()}`,
+		customInstruction?.trim() ? `customInstruction: ${JSON.stringify(customInstruction.trim())}` : undefined,
+		"---",
+		"",
+		summary.trim(),
+		"",
+	]
+		.filter((line): line is string => line !== undefined)
+		.join("\n");
+
+	await writeFile(filePath, content, "utf8");
+	return filePath;
+}
+
+export async function loadLatestSummary(sessionFile: string, sessionId: string): Promise<SavedSummary | undefined> {
+	const dir = summaryDirForSession(sessionFile, sessionId);
+
+	try {
+		const files = await readdir(dir);
+		const latest = files
+			.filter((file) => file.startsWith(SUMMARY_FILE_PREFIX) && file.endsWith(SUMMARY_FILE_EXTENSION))
+			.sort()
+			.at(-1);
+
+		if (!latest) return undefined;
+
+		const summaryPath = path.join(dir, latest);
+		return {
+			path: summaryPath,
+			content: await readFile(summaryPath, "utf8"),
+		};
+	} catch {
+		return undefined;
+	}
+}
+
+export async function loadLatestSummaryForCurrentSession(ctx: ExtensionContext): Promise<SavedSummary | undefined> {
+	const sessionFile = ctx.sessionManager.getSessionFile();
+	if (!sessionFile) return undefined;
+	return loadLatestSummary(sessionFile, ctx.sessionManager.getSessionId());
+}
