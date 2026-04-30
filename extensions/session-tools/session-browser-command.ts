@@ -1,4 +1,5 @@
 import { SessionManager, type ExtensionAPI, type SessionInfo } from "@mariozechner/pi-coding-agent";
+import { parseSummary } from "./summary-parse";
 import { loadLatestSummary } from "./summary-store";
 import { showSummaryUi } from "./summary-ui";
 import { chooseSession } from "./session-browser-ui";
@@ -12,6 +13,7 @@ async function withSummaries(sessions: SessionInfo[]): Promise<BrowserSession[]>
 				...session,
 				latestSummary: savedSummary?.content,
 				latestSummaryPath: savedSummary?.path,
+				parsedSummary: savedSummary ? parseSummary(savedSummary.content) : undefined,
 			};
 		}),
 	);

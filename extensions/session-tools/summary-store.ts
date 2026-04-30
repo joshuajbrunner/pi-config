@@ -2,7 +2,7 @@ import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { SUMMARY_FILE_EXTENSION, SUMMARY_FILE_PREFIX } from "./config";
-import type { SavedSummary } from "./types";
+import type { SavedSummary, SummaryMode } from "./types";
 
 export function summaryDirForSession(sessionFile: string, sessionId: string): string {
 	return path.join(path.dirname(sessionFile), sessionId);
@@ -43,6 +43,7 @@ export async function appendSummaryDebugLog(ctx: ExtensionContext, message: stri
 export async function saveSummaryForCurrentSession(
 	ctx: ExtensionContext,
 	summary: string,
+	mode: SummaryMode,
 	customInstruction?: string,
 ): Promise<string | undefined> {
 	const dir = await ensureSummaryDirForCurrentSession(ctx);
@@ -55,6 +56,7 @@ export async function saveSummaryForCurrentSession(
 		`sessionId: ${ctx.sessionManager.getSessionId()}`,
 		`sessionFile: ${JSON.stringify(sessionFile)}`,
 		`createdAt: ${new Date().toISOString()}`,
+		`mode: ${mode}`,
 		customInstruction?.trim() ? `customInstruction: ${JSON.stringify(customInstruction.trim())}` : undefined,
 		"---",
 		"",

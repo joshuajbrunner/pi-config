@@ -7,6 +7,8 @@ Adds session summary and browsing commands.
 ```text
 /summarize
 /summarize <custom instruction>
+/summarize full
+/summarize full <custom instruction>
 /session-browser
 /session-browser all
 ```
@@ -23,5 +25,7 @@ Summaries are saved beside the session JSONL file in a folder named with the ses
 Existing summaries are never overwritten. `/summarize` creates the session-id directory immediately and appends debug events to `debug.jsonl` in that directory.
 
 ## Model
+
+`/summarize` saves a one-line short summary by default. `/summarize full` saves a short summary plus a detailed resume summary.
 
 Summarization first tries `openai-codex/gpt-5.5`, then falls back to `anthropic/claude-sonnet-4-5` via pi's current model registry/auth flow. Gemini is intentionally not used.

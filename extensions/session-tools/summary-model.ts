@@ -1,19 +1,32 @@
 import { complete, getModel } from "@mariozechner/pi-ai";
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import { SUMMARY_MODEL_CANDIDATES } from "./config";
-import type { SummaryDebugLogger } from "./types";
+import type { SummaryDebugLogger, SummaryMode } from "./types";
 
-function buildSummaryPrompt(conversationText: string, customInstruction?: string): string {
+function buildSummaryPrompt(conversationText: string, mode: SummaryMode, customInstruction?: string): string {
+	const outputInstructions =
+		mode === "short"
+			? [
+					"Return only this Markdown shape:",
+					"",
+					"## Short Summary",
+					"One sentence, maximum 140 characters. Make it useful for choosing/resuming this session.",
+				]
+			: [
+					"Return only this Markdown shape:",
+					"",
+					"## Short Summary",
+					"One sentence, maximum 140 characters. Make it useful for choosing/resuming this session.",
+					"",
+					"## Full Summary",
+					"Concise bullets covering goal, key decisions, files inspected/changed, progress, open questions, and next steps.",
+				];
+
 	return [
 		"Summarize this pi coding-agent session so it can be resumed later.",
+		"Prioritize resume usefulness over detail.",
 		"",
-		"Include concise, structured sections for:",
-		"- Goal / user intent",
-		"- Key decisions and rationale",
-		"- Files inspected or changed",
-		"- Current progress",
-		"- Open questions / risks",
-		"- Concrete next steps",
+		...outputInstructions,
 		"",
 		customInstruction?.trim() ? `Additional user instruction: ${customInstruction.trim()}` : undefined,
 		"",
@@ -59,6 +72,7 @@ function responseDebugDetails(response: Awaited<ReturnType<typeof complete>>) {
 export async function createSummary(
 	conversationText: string,
 	customInstruction: string | undefined,
+	mode: SummaryMode,
 	ctx: ExtensionCommandContext,
 	debugLog?: SummaryDebugLogger,
 ): Promise<string | undefined> {
@@ -66,6 +80,7 @@ export async function createSummary(
 	await debugLog?.("summary_model_start", {
 		conversationChars: conversationText.length,
 		customInstruction,
+		mode,
 		candidates: SUMMARY_MODEL_CANDIDATES,
 	});
 
@@ -99,7 +114,7 @@ export async function createSummary(
 				messages: [
 					{
 						role: "user" as const,
-						content: [{ type: "text" as const, text: buildSummaryPrompt(conversationText, customInstruction) }],
+						content: [{ type: "text" as const, text: buildSummaryPrompt(conversationText, mode, customInstruction) }],
 						timestamp: Date.now(),
 					},
 				],

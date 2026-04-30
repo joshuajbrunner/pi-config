@@ -3,10 +3,23 @@ import { buildConversationText } from "./conversation-extract";
 import { createSummary } from "./summary-model";
 import { appendSummaryDebugLog, ensureSummaryDirForCurrentSession, saveSummaryForCurrentSession } from "./summary-store";
 import { showSummaryUi } from "./summary-ui";
+import type { SummaryMode } from "./types";
+
+function parseSummarizeArgs(args: string): { mode: SummaryMode; customInstruction?: string } {
+	const trimmed = args.trim();
+	if (!trimmed) return { mode: "short" };
+
+	const [first, ...rest] = trimmed.split(/\s+/);
+	if (first?.toLowerCase() === "full") {
+		return { mode: "full", customInstruction: rest.join(" ").trim() || undefined };
+	}
+
+	return { mode: "short", customInstruction: trimmed };
+}
 
 export function registerSummarizeCommand(pi: ExtensionAPI): void {
 	pi.registerCommand("summarize", {
-		description: "Summarize the current session and save the summary beside the session file",
+		description: "Summarize the current session. Default is one-line; use /summarize full for detailed summary",
 		handler: async (args, ctx) => {
 			try {
 				await ctx.waitForIdle();
@@ -18,11 +31,12 @@ export function registerSummarizeCommand(pi: ExtensionAPI): void {
 					sessionFile: ctx.sessionManager.getSessionFile(),
 				});
 
-				const customInstruction = args.trim() || undefined;
+				const { mode, customInstruction } = parseSummarizeArgs(args);
 				const conversationText = buildConversationText(ctx.sessionManager.getBranch());
 				await appendSummaryDebugLog(ctx, "conversation_extracted", {
 					conversationChars: conversationText.length,
 					customInstruction,
+					mode,
 				});
 
 				if (!conversationText.trim()) {
@@ -32,7 +46,7 @@ export function registerSummarizeCommand(pi: ExtensionAPI): void {
 
 				ctx.ui.notify("Creating session summary...", "info");
 
-				const summary = await createSummary(conversationText, customInstruction, ctx, (message, details) =>
+				const summary = await createSummary(conversationText, customInstruction, mode, ctx, (message, details) =>
 					appendSummaryDebugLog(ctx, message, details),
 				);
 				if (!summary) {
@@ -40,7 +54,7 @@ export function registerSummarizeCommand(pi: ExtensionAPI): void {
 					return;
 				}
 
-				const savedPath = await saveSummaryForCurrentSession(ctx, summary, customInstruction);
+				const savedPath = await saveSummaryForCurrentSession(ctx, summary, mode, customInstruction);
 				if (savedPath) {
 					await appendSummaryDebugLog(ctx, "summary_saved", { savedPath, summaryChars: summary.length });
 					ctx.ui.notify(`Summary saved: ${savedPath}`, "success");

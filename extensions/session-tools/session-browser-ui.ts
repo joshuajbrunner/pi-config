@@ -1,16 +1,13 @@
 import { matchesKey } from "@mariozechner/pi-tui";
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import path from "node:path";
+import { stripFrontmatter } from "./summary-parse";
 import type { BrowserSession } from "./types";
 
 const VISIBLE_ROWS = 16;
 const PREVIEW_ROWS = 20;
 
-function stripFrontmatter(markdown: string): string {
-	if (!markdown.startsWith("---\n")) return markdown;
-	const end = markdown.indexOf("\n---\n", 4);
-	return end === -1 ? markdown : markdown.slice(end + 5).trimStart();
-}
+type PreviewMode = "short" | "full";
 
 function truncate(value: string, width: number): string {
 	if (width <= 1) return "";
@@ -50,23 +47,35 @@ function formatDate(date: Date): string {
 	});
 }
 
-function renderBrowser(sessions: BrowserSession[], selected: number, previewScroll: number, width: number, theme: any): string[] {
+function renderBrowser(
+	sessions: BrowserSession[],
+	selected: number,
+	previewScroll: number,
+	previewMode: PreviewMode,
+	width: number,
+	theme: any,
+): string[] {
 	const leftWidth = Math.max(30, Math.min(58, Math.floor(width * 0.38)));
 	const rightWidth = Math.max(30, width - leftWidth - 3);
 	const selectedSession = sessions[selected];
 	const top = Math.max(0, Math.min(selected - Math.floor(VISIBLE_ROWS / 2), Math.max(0, sessions.length - VISIBLE_ROWS)));
 	const visible = sessions.slice(top, top + VISIBLE_ROWS);
 
-	const previewSource = selectedSession.latestSummary
-		? stripFrontmatter(selectedSession.latestSummary)
-		: `No saved summary found.\n\nFirst message:\n${selectedSession.firstMessage || "(empty session)"}`;
+	const parsed = selectedSession.parsedSummary;
+	const previewSource = parsed
+		? previewMode === "full" && parsed.full
+			? `## Short Summary\n${parsed.short}\n\n## Full Summary\n${parsed.full}`
+			: parsed.short
+		: selectedSession.latestSummary
+			? stripFrontmatter(selectedSession.latestSummary)
+			: `No saved summary found.\n\nFirst message:\n${selectedSession.firstMessage || "(empty session)"}`;
 	const preview = wrapText(previewSource, rightWidth, 500).slice(previewScroll, previewScroll + PREVIEW_ROWS);
 
 	const lines: string[] = [];
 	lines.push(theme.fg("accent", theme.bold("Session Browser")));
-	lines.push(theme.fg("dim", "↑/↓ or j/k: move  PgUp/PgDn: scroll summary  Enter: resume  Esc: cancel"));
+	lines.push(theme.fg("dim", "↑/↓ or j/k: move  ctrl+u/ctrl+d or fn+↑/fn+↓: scroll summary  t: toggle short/full  Enter: resume  Esc: cancel"));
 	lines.push("");
-	lines.push(`${theme.bold("Sessions").padEnd(leftWidth)} │ ${theme.bold("Latest Summary")}`);
+	lines.push(`${theme.bold("Sessions").padEnd(leftWidth)} │ ${theme.bold(`Latest Summary (${previewMode})`)}`);
 	lines.push(`${"─".repeat(leftWidth)} │ ${"─".repeat(rightWidth)}`);
 
 	const rowCount = Math.max(VISIBLE_ROWS, preview.length);
@@ -77,7 +86,8 @@ function renderBrowser(sessions: BrowserSession[], selected: number, previewScro
 			const actualIndex = top + row;
 			const marker = actualIndex === selected ? "›" : " ";
 			const summaryMarker = session.latestSummary ? "✓" : " ";
-			const label = truncate(sessionTitle(session).replaceAll("\n", " "), leftWidth - 16);
+			const labelSource = session.parsedSummary?.short || sessionTitle(session);
+			const label = truncate(labelSource.replaceAll("\n", " "), leftWidth - 16);
 			left = `${marker} ${summaryMarker} ${formatDate(session.modified)} ${label}`;
 		}
 
@@ -101,18 +111,23 @@ export async function chooseSession(
 ): Promise<BrowserSession | undefined> {
 	let selected = 0;
 	let previewScroll = 0;
+	let previewMode: PreviewMode = "short";
 	let chosen: BrowserSession | undefined;
 
 	await ctx.ui.custom((tui, theme, _kb, done) => ({
-		render: (width: number) => renderBrowser(sessions, selected, previewScroll, width, theme),
+		render: (width: number) => renderBrowser(sessions, selected, previewScroll, previewMode, width, theme),
 		invalidate: () => {},
 		handleInput: (data: string) => {
 			const oldSelected = selected;
 
 			if (matchesKey(data, "up") || data === "k") selected = Math.max(0, selected - 1);
 			if (matchesKey(data, "down") || data === "j") selected = Math.min(sessions.length - 1, selected + 1);
-			if (matchesKey(data, "pageup")) previewScroll = Math.max(0, previewScroll - PREVIEW_ROWS);
-			if (matchesKey(data, "pagedown")) previewScroll += PREVIEW_ROWS;
+			if (matchesKey(data, "pageup") || data === "\u0015") previewScroll = Math.max(0, previewScroll - PREVIEW_ROWS);
+			if (matchesKey(data, "pagedown") || data === "\u0004") previewScroll += PREVIEW_ROWS;
+			if (data.toLowerCase() === "t") {
+				previewMode = previewMode === "short" ? "full" : "short";
+				previewScroll = 0;
+			}
 
 			if (selected !== oldSelected) previewScroll = 0;
 
