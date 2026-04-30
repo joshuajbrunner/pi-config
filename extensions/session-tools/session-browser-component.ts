@@ -3,10 +3,14 @@ import type { Component, TUI } from "@mariozechner/pi-tui";
 import { matchesKey, truncateToWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import path from "node:path";
 import { stripFrontmatter } from "./summary-parse";
-import type { BrowserSession } from "./types";
+import type { BrowserSession, SummaryMode } from "./types";
 import { formatPath, formatScrollInfo, pad, renderFooter, renderHeader, row } from "./render-helpers";
 
 export type SessionBrowserResult = { session: BrowserSession } | undefined;
+
+export type SessionBrowserOptions = {
+	onSummarize?: (session: BrowserSession, mode: SummaryMode) => Promise<BrowserSession>;
+};
 
 type BrowserScreen = "list" | "detail";
 
@@ -70,13 +74,19 @@ export class SessionBrowserComponent implements Component {
 	private detailScrollOffset = 0;
 	private filterQuery = "";
 	private width = MAX_WIDTH;
+	private busy = false;
+	private statusMessage: { type: "info" | "success" | "error"; text: string } | undefined;
+	private sessions: BrowserSession[];
 
 	constructor(
 		private readonly tui: TUI,
 		private readonly theme: Theme,
-		private readonly sessions: BrowserSession[],
+		sessions: BrowserSession[],
 		private readonly done: (result: SessionBrowserResult) => void,
-	) {}
+		private readonly options: SessionBrowserOptions = {},
+	) {
+		this.sessions = [...sessions];
+	}
 
 	private visibleSessions(): BrowserSession[] {
 		return filteredSessions(this.sessions, this.filterQuery);
@@ -139,10 +149,12 @@ export class SessionBrowserComponent implements Component {
 
 		lines.push(row("", width, theme));
 		const selected = visible[this.cursor];
-		const info = selected ? previewText(selected) : formatScrollInfo(this.scrollOffset, Math.max(0, visible.length - (this.scrollOffset + LIST_VIEWPORT_HEIGHT)));
-		lines.push(row(` ${theme.fg("dim", truncateToWidth(info.replace(/[\r\n]+/g, " "), width - 4))}`, width, theme));
+		const fallbackInfo = selected ? previewText(selected) : formatScrollInfo(this.scrollOffset, Math.max(0, visible.length - (this.scrollOffset + LIST_VIEWPORT_HEIGHT)));
+		const statusColor = this.statusMessage?.type === "error" ? "error" : this.statusMessage?.type === "success" ? "success" : "dim";
+		const info = this.statusMessage?.text || fallbackInfo;
+		lines.push(row(` ${theme.fg(statusColor, truncateToWidth(info.replace(/[\r\n]+/g, " "), width - 4))}`, width, theme));
 		lines.push(row("", width, theme));
-		lines.push(renderFooter(" [enter] resume  [d] detail  [ctrl+u/d] page  [esc] close ", width, theme));
+		lines.push(renderFooter(" [enter] resume  [d] detail  [s] summarize  [S] full  [esc] close ", width, theme));
 		return lines;
 	}
 
@@ -160,13 +172,40 @@ export class SessionBrowserComponent implements Component {
 		for (const line of slice) lines.push(row(` ${line}`, width, theme));
 		for (let i = slice.length; i < DETAIL_VIEWPORT_HEIGHT; i++) lines.push(row("", width, theme));
 		lines.push(row("", width, theme));
-		lines.push(row(` ${theme.fg("dim", formatScrollInfo(this.detailScrollOffset, maxOffset - this.detailScrollOffset))}`, width, theme));
-		lines.push(renderFooter(" [enter] resume  [b] back  [ctrl+u/d] scroll  [esc] close ", width, theme));
+		const scrollInfo = formatScrollInfo(this.detailScrollOffset, maxOffset - this.detailScrollOffset);
+		const statusColor = this.statusMessage?.type === "error" ? "error" : this.statusMessage?.type === "success" ? "success" : "dim";
+		lines.push(row(` ${theme.fg(statusColor, this.statusMessage?.text || scrollInfo)}`, width, theme));
+		lines.push(renderFooter(" [enter] resume  [s] summarize  [S] full  [b] back  [esc] close ", width, theme));
 		return lines;
+	}
+
+	private async summarizeSelected(mode: SummaryMode): Promise<void> {
+		if (!this.options.onSummarize || this.busy) return;
+		const visible = this.clamp();
+		const session = visible[this.cursor];
+		if (!session) return;
+
+		this.busy = true;
+		this.statusMessage = { type: "info", text: mode === "full" ? "Creating full summary..." : "Creating short summary..." };
+		this.tui.requestRender();
+
+		try {
+			const updated = await this.options.onSummarize(session, mode);
+			const index = this.sessions.findIndex((candidate) => candidate.id === updated.id && candidate.path === updated.path);
+			if (index >= 0) this.sessions[index] = updated;
+			this.statusMessage = { type: "success", text: mode === "full" ? "Full summary saved" : "Summary saved" };
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.statusMessage = { type: "error", text: `Summary failed: ${message}` };
+		} finally {
+			this.busy = false;
+			this.tui.requestRender();
+		}
 	}
 
 	handleInput(data: string): void {
 		const visible = this.clamp();
+		if (this.busy) return;
 		if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) {
 			this.done(undefined);
 			return;
@@ -176,6 +215,11 @@ export class SessionBrowserComponent implements Component {
 			this.done(session ? { session } : undefined);
 			return;
 		}
+		if (data === "s" || data === "S") {
+			void this.summarizeSelected(data === "S" ? "full" : "short");
+			return;
+		}
+
 		if (this.screen === "detail") {
 			if (data === "b" || matchesKey(data, "left")) {
 				this.screen = "list";

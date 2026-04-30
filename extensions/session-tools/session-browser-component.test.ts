@@ -85,6 +85,54 @@ describe("SessionBrowserComponent", () => {
 		expect(text).toContain("No full summary saved for this session.");
 	});
 
+	it("summarizes the selected session with short and updates the row", async () => {
+		const updated = session({ id: "first", parsedSummary: { short: "Updated short" }, latestSummary: "summary" });
+		let mode: string | undefined;
+		const component = new SessionBrowserComponent({ requestRender: () => {} } as any, theme, [session({ id: "first", parsedSummary: { short: "Old" } })], () => {}, {
+			onSummarize: async (_session, requestedMode) => {
+				mode = requestedMode;
+				return updated;
+			},
+		});
+
+		component.handleInput("s");
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(mode).toBe("short");
+		expect(component.render(84).join("\n")).toContain("Updated short");
+	});
+
+	it("summarizes the selected session with full on uppercase S", async () => {
+		let mode: string | undefined;
+		const component = new SessionBrowserComponent({ requestRender: () => {} } as any, theme, [session({})], () => {}, {
+			onSummarize: async (selected, requestedMode) => {
+				mode = requestedMode;
+				return selected;
+			},
+		});
+
+		component.handleInput("S");
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(mode).toBe("full");
+	});
+
+	it("shows summarize errors without closing", async () => {
+		let result: SessionBrowserResult | "unset" = "unset";
+		const component = new SessionBrowserComponent({ requestRender: () => {} } as any, theme, [session({})], (value) => { result = value; }, {
+			onSummarize: async () => { throw new Error("boom"); },
+		});
+
+		component.handleInput("s");
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(result).toBe("unset");
+		expect(component.render(84).join("\n")).toContain("Summary failed: boom");
+	});
+
 	it("cancels on escape", () => {
 		const harness = createComponent([session({})]);
 		harness.component.handleInput("\u001b");

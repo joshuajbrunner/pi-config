@@ -19,6 +19,11 @@ function timestampForFile(date = new Date()): string {
 	return date.toISOString().replaceAll(":", "-").replaceAll(".", "-");
 }
 
+function summaryFileName(timestamp: string, attempt: number): string {
+	const suffix = attempt === 0 ? "" : `-${attempt}`;
+	return `${SUMMARY_FILE_PREFIX}${timestamp}${suffix}${SUMMARY_FILE_EXTENSION}`;
+}
+
 export async function ensureSummaryDirForCurrentSession(ctx: ExtensionContext): Promise<string | undefined> {
 	const dir = currentSessionSummaryDir(ctx);
 	if (!dir) return undefined;
@@ -27,9 +32,14 @@ export async function ensureSummaryDirForCurrentSession(ctx: ExtensionContext): 
 	return dir;
 }
 
-export async function appendSummaryDebugLog(ctx: ExtensionContext, message: string, details?: unknown): Promise<void> {
-	const dir = await ensureSummaryDirForCurrentSession(ctx);
-	if (!dir) return;
+export async function appendSummaryDebugLogForSession(
+	sessionFile: string,
+	sessionId: string,
+	message: string,
+	details?: unknown,
+): Promise<void> {
+	const dir = summaryDirForSession(sessionFile, sessionId);
+	await mkdir(dir, { recursive: true });
 
 	const line = JSON.stringify({
 		timestamp: new Date().toISOString(),
@@ -40,20 +50,26 @@ export async function appendSummaryDebugLog(ctx: ExtensionContext, message: stri
 	await appendFile(path.join(dir, "debug.jsonl"), line, "utf8");
 }
 
-export async function saveSummaryForCurrentSession(
-	ctx: ExtensionContext,
+export async function appendSummaryDebugLog(ctx: ExtensionContext, message: string, details?: unknown): Promise<void> {
+	const sessionFile = ctx.sessionManager.getSessionFile();
+	if (!sessionFile) return;
+	await appendSummaryDebugLogForSession(sessionFile, ctx.sessionManager.getSessionId(), message, details);
+}
+
+export async function saveSummaryForSession(
+	sessionFile: string,
+	sessionId: string,
 	summary: string,
 	mode: SummaryMode,
 	customInstruction?: string,
-): Promise<string | undefined> {
-	const dir = await ensureSummaryDirForCurrentSession(ctx);
-	const sessionFile = ctx.sessionManager.getSessionFile();
-	if (!dir || !sessionFile) return undefined;
+): Promise<string> {
+	const dir = summaryDirForSession(sessionFile, sessionId);
+	await mkdir(dir, { recursive: true });
 
-	const filePath = path.join(dir, `${SUMMARY_FILE_PREFIX}${timestampForFile()}${SUMMARY_FILE_EXTENSION}`);
+	const timestamp = timestampForFile();
 	const content = [
 		"---",
-		`sessionId: ${ctx.sessionManager.getSessionId()}`,
+		`sessionId: ${sessionId}`,
 		`sessionFile: ${JSON.stringify(sessionFile)}`,
 		`createdAt: ${new Date().toISOString()}`,
 		`mode: ${mode}`,
@@ -66,8 +82,29 @@ export async function saveSummaryForCurrentSession(
 		.filter((line): line is string => line !== undefined)
 		.join("\n");
 
-	await writeFile(filePath, content, "utf8");
-	return filePath;
+	for (let attempt = 0; attempt < 1000; attempt++) {
+		const filePath = path.join(dir, summaryFileName(timestamp, attempt));
+		try {
+			await writeFile(filePath, content, { encoding: "utf8", flag: "wx" });
+			return filePath;
+		} catch (error) {
+			if (typeof error === "object" && error && "code" in error && error.code === "EEXIST") continue;
+			throw error;
+		}
+	}
+
+	throw new Error("Unable to create unique summary file");
+}
+
+export async function saveSummaryForCurrentSession(
+	ctx: ExtensionContext,
+	summary: string,
+	mode: SummaryMode,
+	customInstruction?: string,
+): Promise<string | undefined> {
+	const sessionFile = ctx.sessionManager.getSessionFile();
+	if (!sessionFile) return undefined;
+	return saveSummaryForSession(sessionFile, ctx.sessionManager.getSessionId(), summary, mode, customInstruction);
 }
 
 export async function loadLatestSummary(sessionFile: string, sessionId: string): Promise<SavedSummary | undefined> {

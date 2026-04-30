@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { appendSummaryDebugLog, loadLatestSummary, saveSummaryForCurrentSession, summaryDirForSession } from "./summary-store";
+import { appendSummaryDebugLog, appendSummaryDebugLogForSession, loadLatestSummary, saveSummaryForCurrentSession, saveSummaryForSession, summaryDirForSession } from "./summary-store";
 
 let tempDirs: string[] = [];
 
@@ -58,6 +58,17 @@ describe("summary store", () => {
 		expect(content).toContain("Summary body");
 	});
 
+	it("does not overwrite existing summaries created in the same millisecond", async () => {
+		const dir = await tempDir();
+		const sessionFile = path.join(dir, "session.jsonl");
+		const first = await saveSummaryForSession(sessionFile, "abc", "first", "short");
+		const second = await saveSummaryForSession(sessionFile, "abc", "second", "short");
+
+		expect(first).not.toBe(second);
+		expect(await readFile(first, "utf8")).toContain("first");
+		expect(await readFile(second, "utf8")).toContain("second");
+	});
+
 	it("appends debug JSONL", async () => {
 		const dir = await tempDir();
 		const sessionFile = path.join(dir, "session.jsonl");
@@ -69,8 +80,12 @@ describe("summary store", () => {
 		} as any;
 
 		await appendSummaryDebugLog(ctx, "message", { ok: true });
+		await appendSummaryDebugLogForSession(sessionFile, "abc", "second", { selected: true });
 		const content = await readFile(path.join(summaryDirForSession(sessionFile, "abc"), "debug.jsonl"), "utf8");
-		expect(JSON.parse(content).message).toBe("message");
-		expect(JSON.parse(content).details).toEqual({ ok: true });
+		const lines = content.trim().split("\n").map((line) => JSON.parse(line));
+		expect(lines[0].message).toBe("message");
+		expect(lines[0].details).toEqual({ ok: true });
+		expect(lines[1].message).toBe("second");
+		expect(lines[1].details).toEqual({ selected: true });
 	});
 });
