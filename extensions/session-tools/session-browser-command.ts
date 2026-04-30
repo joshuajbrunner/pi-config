@@ -1,6 +1,7 @@
 import { SessionManager, type ExtensionAPI, type ExtensionCommandContext, type SessionInfo } from "@mariozechner/pi-coding-agent";
 import { buildConversationTextFromSessionFile } from "./conversation-extract";
 import { createSummary } from "./summary-model";
+import { loadSessionMetrics } from "./session-metrics";
 import { parseSummary } from "./summary-parse";
 import { appendSummaryDebugLogForSession, loadLatestSummary, saveSummaryForSession } from "./summary-store";
 import { showSummaryUi } from "./summary-ui";
@@ -10,12 +11,16 @@ import type { BrowserSession, SummaryMode } from "./types";
 async function withSummaries(sessions: SessionInfo[]): Promise<BrowserSession[]> {
 	return Promise.all(
 		sessions.map(async (session) => {
-			const savedSummary = await loadLatestSummary(session.path, session.id);
+			const [savedSummary, metrics] = await Promise.all([
+				loadLatestSummary(session.path, session.id),
+				loadSessionMetrics(session.path),
+			]);
 			return {
 				...session,
 				latestSummary: savedSummary?.content,
 				latestSummaryPath: savedSummary?.path,
 				parsedSummary: savedSummary ? parseSummary(savedSummary.content) : undefined,
+				metrics,
 			};
 		}),
 	);
@@ -45,12 +50,16 @@ export async function summarizeBrowserSession(
 	const savedPath = await saveSummaryForSession(session.path, session.id, summary, mode);
 	await appendSummaryDebugLogForSession(session.path, session.id, "browser_summary_saved", { savedPath, summaryChars: summary.length });
 
-	const savedSummary = await loadLatestSummary(session.path, session.id);
+	const [savedSummary, metrics] = await Promise.all([
+		loadLatestSummary(session.path, session.id),
+		loadSessionMetrics(session.path),
+	]);
 	return {
 		...session,
 		latestSummary: savedSummary?.content,
 		latestSummaryPath: savedSummary?.path,
 		parsedSummary: savedSummary ? parseSummary(savedSummary.content) : undefined,
+		metrics,
 	};
 }
 

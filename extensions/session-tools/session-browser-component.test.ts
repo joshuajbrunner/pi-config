@@ -17,6 +17,7 @@ function session(overrides: Partial<BrowserSession>): BrowserSession {
 		modified: overrides.modified ?? new Date("2026-01-01T00:00:00Z"),
 		firstMessage: overrides.firstMessage ?? "first message",
 		messageCount: overrides.messageCount ?? 1,
+		metrics: overrides.metrics,
 		latestSummary: overrides.latestSummary,
 		latestSummaryPath: overrides.latestSummaryPath,
 		parsedSummary: overrides.parsedSummary,
@@ -67,7 +68,14 @@ describe("SessionBrowserComponent", () => {
 
 	it("renders detail mode within width", () => {
 		const { component } = createComponent([
-			session({ firstMessage: "Initial user request", parsedSummary: { short: "Short", full: "Full summary" }, latestSummaryPath: "/tmp/summary.md" }),
+			session({
+				firstMessage: "Initial user request",
+				created: new Date("2026-01-01T00:00:00Z"),
+				modified: new Date("2026-01-01T01:30:00Z"),
+				parsedSummary: { short: "Short", full: "Full summary" },
+				latestSummaryPath: "/tmp/summary.md",
+				metrics: { messages: 5, userMessages: 2, assistantMessages: 3, turns: 2, filesTouched: 4 },
+			}),
 		]);
 		component.handleInput("d");
 		const lines = component.render(60);
@@ -75,7 +83,15 @@ describe("SessionBrowserComponent", () => {
 		expect(lines.join("\n")).toContain("Full Summary");
 		expect(lines.join("\n")).toContain("First Message");
 		expect(lines.join("\n")).toContain("Initial user request");
+		expect(lines.join("\n")).toContain("Metrics");
+		expect(lines.join("\n")).toContain("Turns: 2");
+		expect(lines.join("\n")).toContain("Messages: 5 total, 2 user, 3 assistant");
+		expect(lines.join("\n")).toContain("Summary: full");
+		component.handleInput("\u0004");
+		const scrolledLines = component.render(60);
+		expect(scrolledLines.join("\n")).toContain("Files touched: 4");
 		expectWidths(lines, 60);
+		expectWidths(scrolledLines, 60);
 	});
 
 	it("does not repeat short-only summaries under full summary", () => {

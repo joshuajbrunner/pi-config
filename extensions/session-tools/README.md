@@ -15,7 +15,7 @@ Adds session summary and browsing commands.
 
 ## Session browser
 
-`/session-browser` opens a centered floating overlay. It lists sessions by saved short summary when available, supports type-to-filter search, and opens a detail view with `d` for full summaries and metadata. Use `j/k` or arrow keys to move, `ctrl+u/d` or `fn+up/down` to page, `s` to summarize the selected session, `S` to create a full summary, `enter` to resume, and `esc` to cancel.
+`/session-browser` opens a centered floating overlay. It lists sessions by saved short summary when available, supports type-to-filter search, and opens a detail view with `d` for full summaries, first message, metrics, and metadata. Use `j/k` or arrow keys to move, `ctrl+u/d` or `fn+up/down` to page, `s` to summarize the selected session, `S` to create a full summary, `enter` to resume, and `esc` to cancel.
 
 ## Summary storage
 

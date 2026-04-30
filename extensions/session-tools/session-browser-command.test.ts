@@ -7,6 +7,7 @@ const saveSummaryForSession = vi.fn();
 const appendSummaryDebugLogForSession = vi.fn();
 const buildConversationTextFromSessionFile = vi.fn();
 const createSummary = vi.fn();
+const loadSessionMetrics = vi.fn();
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
 	SessionManager: { list, listAll },
@@ -24,6 +25,10 @@ vi.mock("./conversation-extract", () => ({
 
 vi.mock("./summary-model", () => ({
 	createSummary,
+}));
+
+vi.mock("./session-metrics", () => ({
+	loadSessionMetrics,
 }));
 
 vi.mock("./summary-ui", () => ({
@@ -109,6 +114,7 @@ describe("session-browser command", () => {
 		createSummary.mockResolvedValue("## Short Summary\nLatest work");
 		saveSummaryForSession.mockResolvedValue("/tmp/s1/summary.md");
 		loadLatestSummary.mockResolvedValue({ path: "/tmp/s1/summary.md", content: "## Short Summary\nLatest work" });
+		loadSessionMetrics.mockResolvedValue({ messages: 2, userMessages: 1, assistantMessages: 1, turns: 1, filesTouched: 0 });
 
 		const updated = await summarizeBrowserSession(session as any, "short", {
 			modelRegistry: { getApiKeyAndHeaders: vi.fn() },
@@ -118,6 +124,7 @@ describe("session-browser command", () => {
 		expect(buildConversationTextFromSessionFile).toHaveBeenCalledWith("/tmp/session.jsonl");
 		expect(saveSummaryForSession).toHaveBeenCalledWith("/tmp/session.jsonl", "s1", "## Short Summary\nLatest work", "short");
 		expect(updated.parsedSummary?.short).toBe("Latest work");
+		expect(updated.metrics?.messages).toBe(2);
 	});
 
 	it("rejects selected-session summarization when conversation is empty", async () => {

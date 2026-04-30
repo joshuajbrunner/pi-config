@@ -1,5 +1,6 @@
 import type { SessionInfo } from "@mariozechner/pi-coding-agent";
 import type { ParsedSummary } from "./summary-parse";
+import type { SessionMetrics } from "./session-metrics";
 
 export type ContentBlock = {
 	type?: string;
@@ -14,6 +15,7 @@ export type BrowserSession = SessionInfo & {
 	latestSummary?: string;
 	latestSummaryPath?: string;
 	parsedSummary?: ParsedSummary;
+	metrics?: SessionMetrics;
 };
 
 export type SavedSummary = {

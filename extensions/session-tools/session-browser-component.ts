@@ -46,6 +46,34 @@ function previewText(session: BrowserSession): string {
 	return session.firstMessage ? `No saved summary. First message: ${session.firstMessage}` : "No saved summary found.";
 }
 
+function formatDuration(start: Date, end: Date): string {
+	const ms = Math.max(0, end.getTime() - start.getTime());
+	const minutes = Math.floor(ms / 60000);
+	if (minutes < 1) return "<1m";
+	const hours = Math.floor(minutes / 60);
+	const remainingMinutes = minutes % 60;
+	return hours > 0 ? `${hours}h ${remainingMinutes}m` : `${minutes}m`;
+}
+
+function summaryStatus(session: BrowserSession): string {
+	if (session.parsedSummary?.full) return "full";
+	if (session.parsedSummary?.short || session.latestSummary) return "short";
+	return "none";
+}
+
+function metricsText(session: BrowserSession): string[] {
+	const metrics = session.metrics;
+	return [
+		"Metrics",
+		metrics ? `Turns: ${metrics.turns}` : `Turns: ${session.messageCount ?? "unknown"}`,
+		metrics ? `Messages: ${metrics.messages} total, ${metrics.userMessages} user, ${metrics.assistantMessages} assistant` : `Messages: ${session.messageCount ?? "unknown"}`,
+		`Summary: ${summaryStatus(session)}`,
+		`Duration: ${formatDuration(session.created, session.modified)}`,
+		`Files touched: ${metrics?.filesTouched ?? "unknown"}`,
+		`Last activity: ${session.modified.toLocaleString()}`,
+	];
+}
+
 function fullDetailText(session: BrowserSession): string {
 	const parts: string[] = [];
 	parts.push("Short Summary");
@@ -56,6 +84,8 @@ function fullDetailText(session: BrowserSession): string {
 	parts.push("");
 	parts.push("First Message");
 	parts.push(session.firstMessage || "No first message recorded.");
+	parts.push("");
+	parts.push(...metricsText(session));
 	parts.push("");
 	parts.push("Metadata");
 	parts.push(`Modified: ${session.modified.toLocaleString()}`);
