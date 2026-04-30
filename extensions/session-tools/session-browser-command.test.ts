@@ -62,6 +62,7 @@ describe("session-browser command", () => {
 		const switchSession = vi.fn(async () => ({ cancelled: false }));
 		await handler!("", {
 			cwd: "/tmp",
+			sessionManager: { getSessionId: () => "s1", getSessionFile: () => "/tmp/session.jsonl" },
 			waitForIdle: vi.fn(),
 			ui: { notify: vi.fn(), custom },
 			switchSession,
@@ -85,6 +86,7 @@ describe("session-browser command", () => {
 
 		await handler!("", {
 			cwd: "/tmp",
+			sessionManager: { getSessionId: () => "current", getSessionFile: () => "/tmp/current.jsonl" },
 			waitForIdle: vi.fn(),
 			ui: { notify: vi.fn(), custom: vi.fn(async () => undefined) },
 			switchSession,
@@ -105,7 +107,7 @@ describe("session-browser command", () => {
 			expect((component as any).options.onSummarize).toEqual(expect.any(Function));
 			return undefined;
 		});
-		await handler!("", { cwd: "/tmp", waitForIdle: vi.fn(), ui: { notify: vi.fn(), custom }, switchSession: vi.fn() });
+		await handler!("", { cwd: "/tmp", sessionManager: { getSessionId: () => "current", getSessionFile: () => "/tmp/current.jsonl" }, waitForIdle: vi.fn(), ui: { notify: vi.fn(), custom }, switchSession: vi.fn() });
 	});
 
 	it("summarizes a selected session from its session file and returns updated metadata", async () => {
@@ -137,7 +139,7 @@ describe("session-browser command", () => {
 		let handler: ((args: string, ctx: any) => Promise<void>) | undefined;
 		registerSessionBrowserCommand({ registerCommand: (_name: string, command: any) => { handler = command.handler; } } as any);
 
-		await handler!("all", { cwd: "/tmp", waitForIdle: vi.fn(), ui: { notify: vi.fn(), custom: vi.fn() }, switchSession: vi.fn() });
+		await handler!("all", { cwd: "/tmp", sessionManager: { getSessionId: () => "current", getSessionFile: () => "/tmp/current.jsonl" }, waitForIdle: vi.fn(), ui: { notify: vi.fn(), custom: vi.fn() }, switchSession: vi.fn() });
 
 		expect(listAll).toHaveBeenCalled();
 		expect(list).not.toHaveBeenCalled();

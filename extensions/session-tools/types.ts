@@ -16,6 +16,7 @@ export type BrowserSession = SessionInfo & {
 	latestSummaryPath?: string;
 	parsedSummary?: ParsedSummary;
 	metrics?: SessionMetrics;
+	isCurrent?: boolean;
 };
 
 export type SavedSummary = {

@@ -8,7 +8,7 @@ import { showSummaryUi } from "./summary-ui";
 import { SessionBrowserComponent, type SessionBrowserResult } from "./session-browser-component";
 import type { BrowserSession, SummaryMode } from "./types";
 
-async function withSummaries(sessions: SessionInfo[]): Promise<BrowserSession[]> {
+async function withSummaries(sessions: SessionInfo[], currentSessionId?: string, currentSessionFile?: string): Promise<BrowserSession[]> {
 	return Promise.all(
 		sessions.map(async (session) => {
 			const [savedSummary, metrics] = await Promise.all([
@@ -21,6 +21,7 @@ async function withSummaries(sessions: SessionInfo[]): Promise<BrowserSession[]>
 				latestSummaryPath: savedSummary?.path,
 				parsedSummary: savedSummary ? parseSummary(savedSummary.content) : undefined,
 				metrics,
+				isCurrent: session.id === currentSessionId || session.path === currentSessionFile,
 			};
 		}),
 	);
@@ -86,7 +87,11 @@ export function registerSessionBrowserCommand(pi: ExtensionAPI): void {
 					return;
 				}
 
-				const sessions = (await withSummaries(sessionInfos)).sort(
+				const sessions = (await withSummaries(
+					sessionInfos,
+					ctx.sessionManager.getSessionId(),
+					ctx.sessionManager.getSessionFile(),
+				)).sort(
 					(a, b) => b.modified.getTime() - a.modified.getTime(),
 				);
 

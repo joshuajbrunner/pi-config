@@ -21,6 +21,7 @@ function session(overrides: Partial<BrowserSession>): BrowserSession {
 		latestSummary: overrides.latestSummary,
 		latestSummaryPath: overrides.latestSummaryPath,
 		parsedSummary: overrides.parsedSummary,
+		isCurrent: overrides.isCurrent,
 	} as BrowserSession;
 }
 
@@ -86,12 +87,22 @@ describe("SessionBrowserComponent", () => {
 		expect(lines.join("\n")).toContain("Metrics");
 		expect(lines.join("\n")).toContain("Turns: 2");
 		expect(lines.join("\n")).toContain("Messages: 5 total, 2 user, 3 assistant");
+		expect(lines.join("\n")).toContain("Status: inactive");
 		expect(lines.join("\n")).toContain("Summary: full");
 		component.handleInput("\u0004");
 		const scrolledLines = component.render(60);
 		expect(scrolledLines.join("\n")).toContain("Files touched: 4");
 		expectWidths(lines, 60);
 		expectWidths(scrolledLines, 60);
+	});
+
+	it("marks current sessions in list and detail", () => {
+		const { component } = createComponent([
+			session({ isCurrent: true, parsedSummary: { short: "Current session" }, metrics: { messages: 1, userMessages: 1, assistantMessages: 0, turns: 1, filesTouched: 0 } }),
+		]);
+		expect(component.render(84).join("\n")).toContain("●");
+		component.handleInput("d");
+		expect(component.render(84).join("\n")).toContain("Status: current session");
 	});
 
 	it("does not repeat short-only summaries under full summary", () => {

@@ -67,6 +67,7 @@ function metricsText(session: BrowserSession): string[] {
 		"Metrics",
 		metrics ? `Turns: ${metrics.turns}` : `Turns: ${session.messageCount ?? "unknown"}`,
 		metrics ? `Messages: ${metrics.messages} total, ${metrics.userMessages} user, ${metrics.assistantMessages} assistant` : `Messages: ${session.messageCount ?? "unknown"}`,
+		`Status: ${session.isCurrent ? "current session" : "inactive"}`,
 		`Summary: ${summaryStatus(session)}`,
 		`Duration: ${formatDuration(session.created, session.modified)}`,
 		`Files touched: ${metrics?.filesTouched ?? "unknown"}`,
@@ -172,10 +173,11 @@ export class SessionBrowserComponent implements Component {
 				const selected = index === this.cursor;
 				const marker = selected ? theme.fg("accent", ">") : " ";
 				const summaryMark = session.latestSummary ? theme.fg("success", "✓") : " ";
+				const currentMark = session.isCurrent ? theme.fg("accent", "●") : " ";
 				const date = theme.fg("dim", formatDate(session.modified));
-				const titleWidth = Math.max(0, innerWidth - 18);
+				const titleWidth = Math.max(0, innerWidth - 20);
 				const title = selected ? theme.fg("accent", sessionTitle(session)) : sessionTitle(session);
-				lines.push(row(` ${marker} ${summaryMark} ${date} ${truncateToWidth(title.replace(/[\r\n]+/g, " "), titleWidth)}`, width, theme));
+				lines.push(row(` ${marker} ${summaryMark}${currentMark} ${date} ${truncateToWidth(title.replace(/[\r\n]+/g, " "), titleWidth)}`, width, theme));
 			}
 			for (let i = slice.length; i < LIST_VIEWPORT_HEIGHT; i++) lines.push(row("", width, theme));
 		}
