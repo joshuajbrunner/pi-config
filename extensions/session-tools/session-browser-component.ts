@@ -177,7 +177,7 @@ export class SessionBrowserComponent implements Component {
 				const date = theme.fg("dim", formatDate(session.modified));
 				const titleWidth = Math.max(0, innerWidth - 20);
 				const title = selected ? theme.fg("accent", sessionTitle(session)) : sessionTitle(session);
-				lines.push(row(` ${marker} ${summaryMark}${currentMark} ${date} ${truncateToWidth(title.replace(/[\r\n]+/g, " "), titleWidth)}`, width, theme));
+				lines.push(row(` ${marker} ${summaryMark} ${currentMark} ${date} ${truncateToWidth(title.replace(/[\r\n]+/g, " "), titleWidth)}`, width, theme));
 			}
 			for (let i = slice.length; i < LIST_VIEWPORT_HEIGHT; i++) lines.push(row("", width, theme));
 		}
