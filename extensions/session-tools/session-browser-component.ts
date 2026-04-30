@@ -48,7 +48,7 @@ function fullDetailText(session: BrowserSession): string {
 	parts.push(session.parsedSummary?.short || "No short summary saved.");
 	parts.push("");
 	parts.push("Full Summary");
-	parts.push(session.parsedSummary?.full || (session.latestSummary ? stripFrontmatter(session.latestSummary) : "No full summary saved."));
+	parts.push(session.parsedSummary?.full || "No full summary saved for this session.");
 	parts.push("");
 	parts.push("Metadata");
 	parts.push(`Modified: ${session.modified.toLocaleString()}`);

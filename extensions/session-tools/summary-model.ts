@@ -25,6 +25,9 @@ function buildSummaryPrompt(conversationText: string, mode: SummaryMode, customI
 	return [
 		"Summarize this pi coding-agent session so it can be resumed later.",
 		"Prioritize resume usefulness over detail.",
+		"Focus primarily on the most recent work and the current end state of the session.",
+		"If the session changed topics, emphasize what we were doing last rather than what we started with.",
+		"Mention earlier context only when it is necessary to understand the latest work or next steps.",
 		"",
 		...outputInstructions,
 		"",

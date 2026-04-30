@@ -76,6 +76,15 @@ describe("SessionBrowserComponent", () => {
 		expectWidths(lines, 60);
 	});
 
+	it("does not repeat short-only summaries under full summary", () => {
+		const { component } = createComponent([
+			session({ latestSummary: "## Short Summary\nOnly short", parsedSummary: { short: "Only short" } }),
+		]);
+		component.handleInput("d");
+		const text = component.render(84).join("\n");
+		expect(text).toContain("No full summary saved for this session.");
+	});
+
 	it("cancels on escape", () => {
 		const harness = createComponent([session({})]);
 		harness.component.handleInput("\u001b");
