@@ -111,6 +111,7 @@ export async function createSummary(
 		const response = await complete(
 			model,
 			{
+				systemPrompt: "You summarize pi coding-agent sessions. Follow the user's requested Markdown output shape exactly.",
 				messages: [
 					{
 						role: "user" as const,
