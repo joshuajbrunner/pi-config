@@ -1,6 +1,6 @@
 ---
 name: write-plan
-description: Interview the user about a plan or feature until reaching shared understanding, then document it as a high-level structured plan. Use when the user wants to plan a feature, design a system, or mentions "write a plan" or "plan this out". Does NOT include tasks - use /skill:plan-to-tasks after to decompose into actionable tasks.
+description: Interview the user about a plan or feature until reaching shared understanding, then document it as a high-level structured plan. Use when the user wants to plan a feature, design a system, or mentions "write a plan" or "plan this out". Does NOT include tasks - use /skill:write-stories after to decompose into actionable stories.
 ---
 
 # Write Plan
@@ -21,67 +21,69 @@ For each question:
 
 ### Phase 2: Documentation
 
-Once we have shared understanding, create the plan document:
+Once we have shared understanding:
 
-1. Ask the user for a plan name (kebab-case, e.g., `auth-refactor`, `api-v2`)
-2. Create the plan at `.pi/plans/<plan-name>/PLAN.md`
+1. Determine the next phase number by checking existing plans in `docs/plans/`
+2. Ask the user for a plan name (kebab-case, e.g., `tenant-foundation`, `encryption`)
+3. Create the plan at `docs/plans/{NNN}-{name}/PLAN.md`
 
 ## Plan Structure
 
 ```markdown
-# <Plan Title>
+# Phase N: <Title>
+
+**Status**: ⬜ Not Started
+**Depends on**: Phase N-1 (<name>)
 
 ## Overview
 
-Brief description of what this plan accomplishes.
+Brief description of what this phase accomplishes (1-2 paragraphs).
 
-## Goals
+## Stories
 
-- Goal 1
-- Goal 2
+| # | Story | Status |
+|---|-------|--------|
+| N.1 | [Story Title](./stories/001-story-name.md) | ⬜ Not Started |
+| N.2 | [Story Title](./stories/002-story-name.md) | ⬜ Not Started |
 
-## Non-Goals
+## Dependencies
 
-- What this plan explicitly does NOT cover
+Which phases must be complete first, and why.
 
-## Background
+## Decisions
 
-Context and motivation for this plan.
+| Decision | Choice | Rationale |
+|---|---|---|
+| Key decision 1 | What we chose | Why |
 
-## Design
+## Out of Scope
 
-High-level approach and architecture decisions.
-
-## Open Questions
-
-- Any unresolved questions or decisions to revisit
+- What this phase explicitly does NOT cover
+- Things that belong in a later phase
 
 ## References
 
-- Links to related docs, PRs, or resources
+- Links to relevant reference docs
 ```
 
-**Note:** Plans do NOT include tasks. Use `/skill:plan-to-tasks` to decompose a plan into actionable tasks.
+## Guidelines
+
+- **Stories are titles only** in the PLAN.md. Story files are NOT created yet — use `/skill:write-stories` when ready to flesh them out.
+- **Keep plans focused** — one clear goal per phase. If it's doing two unrelated things, split it.
+- **Number sequentially** — check `ls docs/plans/` for the next number.
+- **Dependency chain** — later phases depend on earlier ones. Make this explicit.
+- **3-6 stories per plan** — if more, the phase is too big. Split it.
 
 ## Storage Location
 
-All plans MUST be stored at:
-
 ```
-.pi/plans/<plan-name>/PLAN.md
+docs/plans/{NNN}-{name}/
+├── PLAN.md          ← Created by this skill
+└── stories/         ← Directory created, but files come later via write-stories
 ```
 
 Examples:
 
-- `.pi/plans/auth-refactor/PLAN.md`
-- `.pi/plans/api-v2-migration/PLAN.md`
-- `.pi/plans/dashboard-redesign/PLAN.md`
-
-Supporting files (diagrams, research, etc.) go in the same directory:
-
-```
-.pi/plans/auth-refactor/
-├── PLAN.md
-├── architecture-diagram.md
-└── research-notes.md
-```
+- `docs/plans/002-tenant-foundation/PLAN.md`
+- `docs/plans/007-encryption/PLAN.md`
+- `docs/plans/009-wallet-domain/PLAN.md`
