@@ -24,7 +24,7 @@ For each question:
 Once we have shared understanding:
 
 1. Determine the next phase number by checking existing plans in `docs/plans/`
-2. Ask the user for a plan name (kebab-case, e.g., `tenant-foundation`, `encryption`)
+2. Ask the user for a plan name (kebab-case, e.g., `auth-refactor`, `api-v2`)
 3. Create the plan at `docs/plans/{NNN}-{name}/PLAN.md`
 
 ## Plan Structure
@@ -84,6 +84,6 @@ docs/plans/{NNN}-{name}/
 
 Examples:
 
-- `docs/plans/002-tenant-foundation/PLAN.md`
-- `docs/plans/007-encryption/PLAN.md`
-- `docs/plans/009-wallet-domain/PLAN.md`
+- `docs/plans/002-auth-foundation/PLAN.md`
+- `docs/plans/005-api-v2/PLAN.md`
+- `docs/plans/008-notifications/PLAN.md`

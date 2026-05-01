@@ -82,7 +82,7 @@ Examples:
 
 ### Subtask Section
 
-Always include the subtask placeholder. Subtasks are **never pre-planned** — they emerge during `/skill:implement-story` when the mentor walks the student through implementation step-by-step.
+Always include the subtask placeholder. Subtasks are **never pre-planned** — they emerge during `/skill:implement-story` as implementation progresses.
 
 ## Listing Available Plans
 

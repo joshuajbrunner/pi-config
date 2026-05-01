@@ -5,7 +5,7 @@ description: Implement one or more stories from a plan. Use when the user wants 
 
 # Implement Story
 
-Implement stories from a plan while respecting dependency ordering and teaching through subtasks.
+Implement stories from a plan while respecting dependency ordering. Tracks progress through subtasks.
 
 ## Process
 
@@ -51,16 +51,16 @@ The user can specify stories by:
 - **Next** — "Next story" (first incomplete story with satisfied dependencies)
 - **Phase** — "Implement all Phase 2 stories" (sequential)
 
-## Implementation Flow (The Teaching Moment)
+## Implementation Flow
 
-For each story, walk through acceptance criteria one by one. This is where the **mentor-student dynamic** happens — explain each concern, show where things go, and add subtasks to the story file as you complete them.
+For each story, work through acceptance criteria incrementally. Explain reasoning behind decisions, record subtasks as you go.
 
 ### Step-by-step:
 
 1. **Announce** — State which story and criterion you're working on
-2. **Teach** — Explain the concern: why it matters, where it lives, what to watch out for
+2. **Explain** — Briefly describe the approach and any trade-offs
 3. **Implement** — Write the code, create files, run commands
-4. **Test** — Run relevant tests or demonstrate it works
+4. **Verify** — Run relevant tests or demonstrate it works
 5. **Record subtask** — Add the completed subtask to the story file
 6. **Repeat** — Move to next acceptance criterion
 
