@@ -31,6 +31,15 @@ suffix = sha256(SALT + chars[4,7,20] + VERSION).slice(0, 3)
 
 This makes the billing header indistinguishable from real Claude Code requests.
 
+## Important: Disable Extra Usage
+
+Before using this extension, **disable extra usage** in your Claude account settings:
+
+1. Go to [claude.ai/settings/usage](https://claude.ai/settings/usage)
+2. Toggle **extra usage off**
+
+If extra usage is enabled and the patch fails or Anthropic changes their detection, you could silently fall back to pay-as-you-go API rates instead of being blocked. With a Max plan at $100–$200/month, unexpected API billing can add up fast — especially with agentic workloads that consume tokens heavily. Disabling extra usage ensures you get a hard stop instead of a surprise bill.
+
 ## Install
 
 ```bash
