@@ -50,3 +50,33 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 ## Usage
 
 Skills are automatically available when the package is installed. Reference them with `/skill:<name>` or let pi load them based on task context.
+
+## Installed third-party packages
+
+These aren't part of this repo --- they're installed via `pi install` and tracked in `~/.pi/agent/settings.json`. Listed here for reproducibility on a fresh machine.
+
+Filter syntax in the table:
+- `-<file>` --- extension is **disabled** (excluded from load)
+- `+<file>` --- **only** that extension is enabled (allowlist; everything else disabled)
+
+| Source | Purpose | Filters |
+|---|---|---|
+| `npm:pi-powerline-footer` | Powerline-style status footer in the TUI | --- |
+| `npm:pi-mcp-adapter` | MCP server bridge | disabled: `index.ts` |
+| `npm:@aliou/pi-guardrails` | Safety guardrails for tool calls | only: `src/index.ts` |
+| `npm:pi-extmgr` | Extension manager TUI | --- |
+| `npm:pi-context` | `context_log` / `context_tag` / `context_checkout` tools | --- |
+| `npm:pi-intercom` | Cross-session messaging between pi instances | --- |
+| `npm:pi-cache-graph` | Cache usage visualization | --- |
+| `npm:pi-cursor-agent` | Cursor editor integration | --- |
+| `git:github.com/jonjonrankin/pi-caveman` | Caveman persona extension | disabled: `extensions/caveman.ts` |
+| `git:github.com/fluxgear/pi-thinking-steps` | Thinking-step UI rendering | disabled: `index.ts` |
+
+### Reinstall on a fresh machine
+
+```bash
+bash scripts/reinstall.sh
+```
+
+The script reinstalls every package above and then re-applies the disable/allowlist filters by writing them into `~/.pi/agent/settings.json` via `jq`.
+
