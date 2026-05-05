@@ -88,7 +88,7 @@ Subtasks should capture:
 
 When all acceptance criteria are met:
 
-1. **Update story file** — Set status to `✅ Done`, add commit reference
+1. **Update story file** — Set status to `✅ Done`, add the commit message reference
 2. **Update PLAN.md** — Change story status in the table from `⬜` to `✅ Done`
 3. **Commit** — All work for a story should be committed with a descriptive message
 
@@ -98,7 +98,7 @@ When all acceptance criteria are met:
 # Story 2.1: Tenant Model & RLS Isolation
 
 **Status**: ✅ Done
-**Commit**: `abc1234 feat: add tenant model with rls isolation`
+**Commit**: `feat: add tenant model with rls isolation`
 
 **As a** platform operator
 ...
