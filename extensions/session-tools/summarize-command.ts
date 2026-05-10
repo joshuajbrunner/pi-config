@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildConversationText } from "./conversation-extract";
 import { createSummary } from "./summary-model";
 import { appendSummaryDebugLog, ensureSummaryDirForCurrentSession, saveSummaryForCurrentSession } from "./summary-store";

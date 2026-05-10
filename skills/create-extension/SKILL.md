@@ -18,9 +18,9 @@ Create pi extensions that add custom tools, commands, event handlers, and UI int
 ## Available Imports
 
 ```typescript
-import type { ExtensionAPI, ExtensionContext } from '@mariozechner/pi-coding-agent';
-import { Type } from '@sinclair/typebox'; // Schema definitions for tool parameters
-import { StringEnum } from '@mariozechner/pi-ai'; // Google-compatible enums
+import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
+import { Type } from 'typebox'; // Schema definitions for tool parameters
+import { StringEnum } from '@earendil-works/pi-ai'; // Google-compatible enums
 ```
 
 Node.js built-ins (`node:fs`, `node:path`, etc.) are also available.
@@ -28,8 +28,8 @@ Node.js built-ins (`node:fs`, `node:path`, etc.) are also available.
 ## Basic Extension Template
 
 ```typescript
-import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
-import { Type } from '@sinclair/typebox';
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import { Type } from 'typebox';
 
 export default function (pi: ExtensionAPI) {
   // Subscribe to events
@@ -108,8 +108,8 @@ ctx.ui.setWidget('my-ext', ['Line 1', 'Line 2']); // Widget above editor
 ### Tool Parameters with TypeBox
 
 ```typescript
-import { Type } from '@sinclair/typebox';
-import { StringEnum } from '@mariozechner/pi-ai';
+import { Type } from 'typebox';
+import { StringEnum } from '@earendil-works/pi-ai';
 
 parameters: Type.Object({
   // Required string

@@ -66,7 +66,7 @@ gh issue create --repo <owner/repo>
 ## Example
 
 ```bash
-gh issue create --repo mariozechner/pi \
+gh issue create --repo earendil-works/pi-mono \
   --title "TUI artifacts in extension config panel with multi-line descriptions" \
   --body "## Description
 

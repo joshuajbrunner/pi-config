@@ -16,7 +16,7 @@
  * REQUIRES: /login (pi's normal OAuth)
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -181,8 +181,8 @@ function sanitizeSystemPrompt(text: string): string {
 		.replace(/pi packages/g, "packages")
 		.replace(/read pi \.md/g, "read .md")
 		.replace(/pi-coding-agent/g, "coding-agent")
-		.replace(/@mariozechner\/pi-ai/g, "@anthropic/ai")
-		.replace(/@mariozechner\/pi-tui/g, "@anthropic/tui")
+		.replace(/@earendil-works\/pi-ai/g, "@anthropic/ai")
+		.replace(/@earendil-works\/pi-tui/g, "@anthropic/tui")
 		.replace(/about pi\b/g, "about this tool")
 		.replace(/pi update\b/g, "update")
 		.replace(/Run pi update/g, "Run update")

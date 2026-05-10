@@ -1,4 +1,4 @@
-import { SessionManager, type ExtensionAPI, type ExtensionCommandContext, type SessionInfo } from "@mariozechner/pi-coding-agent";
+import { SessionManager, type ExtensionAPI, type ExtensionCommandContext, type SessionInfo } from "@earendil-works/pi-coding-agent";
 import { buildConversationTextFromSessionFile } from "./conversation-extract";
 import { createSummary } from "./summary-model";
 import { loadSessionMetrics } from "./session-metrics";

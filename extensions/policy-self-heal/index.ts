@@ -1,5 +1,5 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import type { AssistantMessage, AssistantMessageEvent, TextContent, ThinkingContent, ToolCall } from "@mariozechner/pi-ai";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { AssistantMessage, AssistantMessageEvent, TextContent, ThinkingContent, ToolCall } from "@earendil-works/pi-ai";
 
 const EXTENSION_NAME = "policy-self-heal";
 const CUSTOM_ENTRY_TYPE = "policy-self-heal-event";

@@ -20,8 +20,8 @@
  *   - Single binary via `brew install tectonic`
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { execFile } from "node:child_process";
 import { access, stat } from "node:fs/promises";
 import { basename, dirname, extname, resolve } from "node:path";

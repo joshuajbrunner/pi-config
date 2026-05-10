@@ -9,7 +9,7 @@ const buildConversationTextFromSessionFile = vi.fn();
 const createSummary = vi.fn();
 const loadSessionMetrics = vi.fn();
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
 	SessionManager: { list, listAll },
 }));
 

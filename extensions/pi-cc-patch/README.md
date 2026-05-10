@@ -1,6 +1,6 @@
 # pi-cc-patch
 
-Use your Pro/Max subscription billing with [pi](https://github.com/mariozechner/pi-coding-agent) instead of getting the "Third-party apps now draw from your extra usage" error.
+Use your Pro/Max subscription billing with [pi](https://github.com/earendil-works/pi-mono) instead of getting the "Third-party apps now draw from your extra usage" error.
 
 ## What it does
 

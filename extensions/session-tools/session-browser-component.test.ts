@@ -1,4 +1,4 @@
-import { visibleWidth } from "@mariozechner/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import { SessionBrowserComponent, type SessionBrowserResult } from "./session-browser-component";
 import type { BrowserSession } from "./types";

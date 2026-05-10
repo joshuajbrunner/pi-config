@@ -1,5 +1,5 @@
-import { complete, getModel } from "@mariozechner/pi-ai";
-import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import { complete, getModel } from "@earendil-works/pi-ai";
+import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { SUMMARY_MODEL_CANDIDATES } from "./config";
 import type { SummaryDebugLogger, SummaryMode } from "./types";
 

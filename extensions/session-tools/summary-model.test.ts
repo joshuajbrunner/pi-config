@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 const complete = vi.fn();
 const getModel = vi.fn(() => ({ provider: "openai-codex", id: "gpt-5.5" }));
 
-vi.mock("@mariozechner/pi-ai", () => ({ complete, getModel }));
+vi.mock("@earendil-works/pi-ai", () => ({ complete, getModel }));
 
 const { createSummary } = await import("./summary-model");
 
