@@ -6,10 +6,12 @@
     "pi-package"
   ],
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "vitest": "^3.2.4"
+    "@vitest/coverage-v8": "^4.1.6",
+    "vitest": "^4.1.6"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

@@ -18,11 +18,12 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { lstat, mkdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 const SYSTEM_PROMPT_LOG = "system-prompts.jsonl";
 const MAX_LOG_ENTRIES = 50;
+export const VIRTUAL_PACKAGE_DIR = "/tmp/coding-agent";
 
 // Billing header constants (extracted from Claude Code binary)
 const BILLING_SALT = "59cf53e54c78";
@@ -31,6 +32,7 @@ const CC_ENTRYPOINT = "cli";
 
 // Session-level cache for the version suffix (reset on session_start)
 let cachedVersionSuffix: string | null = null;
+let realPackageDir: string | null = null;
 
 /**
  * Computes the version suffix using Claude Code's algorithm.
@@ -92,7 +94,7 @@ function getSessionDataDir(sessionFile: string): string {
 	return join(sessionDir, sessionName);
 }
 
-async function logSystemPrompt(
+export async function logSystemPrompt(
 	sessionFile: string,
 	model: string,
 	system: any
@@ -100,18 +102,8 @@ async function logSystemPrompt(
 	const sessionDataDir = getSessionDataDir(sessionFile);
 	const logFile = join(sessionDataDir, SYSTEM_PROMPT_LOG);
 
-	// Build system prompt string from blocks or string
-	let systemPrompt: string;
-	if (Array.isArray(system)) {
-		systemPrompt = system
-			.filter((b: any) => b.type === "text" && b.text)
-			.map((b: any) => b.text)
-			.join("\n\n");
-	} else if (typeof system === "string") {
-		systemPrompt = system;
-	} else {
-		return;
-	}
+	const systemPrompt = systemPromptToString(system);
+	if (systemPrompt === null) return;
 
 	const entry: SystemPromptEntry = {
 		timestamp: new Date().toISOString(),
@@ -139,7 +131,7 @@ async function logSystemPrompt(
 	await writeFile(logFile, lines.join("\n") + "\n");
 }
 
-async function readSystemPrompts(sessionFile: string): Promise<SystemPromptEntry[]> {
+export async function readSystemPrompts(sessionFile: string): Promise<SystemPromptEntry[]> {
 	const sessionDataDir = getSessionDataDir(sessionFile);
 	const logFile = join(sessionDataDir, SYSTEM_PROMPT_LOG);
 
@@ -152,12 +144,40 @@ async function readSystemPrompts(sessionFile: string): Promise<SystemPromptEntry
 	}
 }
 
-function formatTimestamp(iso: string): string {
+export function formatTimestamp(iso: string): string {
 	const date = new Date(iso);
 	return date.toLocaleString();
 }
 
-function isAnthropicTarget(
+export function parseDisplayLimit(args: string): number {
+	const limit = args.trim() ? parseInt(args.trim(), 10) : 10;
+	return isNaN(limit) || limit <= 0 ? 10 : limit;
+}
+
+export function buildSystemPromptSelection(
+	entries: SystemPromptEntry[],
+	displayLimit: number,
+): { reversedEntries: SystemPromptEntry[]; items: string[]; title: string } {
+	const reversedEntries = [...entries].reverse().slice(0, displayLimit);
+	const items = reversedEntries.map((e) => `${formatTimestamp(e.timestamp)} - ${e.model}`);
+	const title = entries.length > displayLimit
+		? `System Prompts (${displayLimit} of ${entries.length}, newest first)`
+		: `System Prompts (${entries.length} total, newest first)`;
+	return { reversedEntries, items, title };
+}
+
+export function systemPromptToString(system: any): string | null {
+	if (Array.isArray(system)) {
+		return system
+			.filter((b: any) => b.type === "text" && b.text)
+			.map((b: any) => b.text)
+			.join("\n\n");
+	}
+	if (typeof system === "string") return system;
+	return null;
+}
+
+export function isAnthropicTarget(
 	payload: Record<string, any>,
 	model: { provider?: string; id?: string } | undefined,
 ): boolean {
@@ -173,62 +193,123 @@ function isAnthropicTarget(
 	);
 }
 
-function sanitizeSystemPrompt(text: string): string {
-	return text
-		.replace(/operating inside pi, a coding agent harness\./g, "operating as a coding assistant.")
-		.replace(/Pi documentation/g, "Documentation")
-		.replace(/pi itself,/g, "the tool itself,")
-		.replace(/pi packages/g, "packages")
-		.replace(/read pi \.md/g, "read .md")
+export function escapeRegExp(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function extractPackageDirFromSystemPrompt(text: string): string | null {
+	const mainDocsMatch = text.match(/^- Main documentation:\s+(.+)\/README\.md\s*$/m);
+	if (mainDocsMatch?.[1]) return mainDocsMatch[1];
+
+	const docsMatch = text.match(/^- Additional docs:\s+(.+)\/docs\s*$/m);
+	if (docsMatch?.[1]) return docsMatch[1];
+
+	const examplesMatch = text.match(/^- Examples:\s+(.+)\/examples\b.*$/m);
+	if (examplesMatch?.[1]) return examplesMatch[1];
+
+	return null;
+}
+
+export async function ensureVirtualPackageDir(packageDir: string): Promise<void> {
+	try {
+		const stat = await lstat(VIRTUAL_PACKAGE_DIR);
+		if (stat.isSymbolicLink()) {
+			const target = await readlink(VIRTUAL_PACKAGE_DIR);
+			if (target === packageDir) return;
+		}
+		await rm(VIRTUAL_PACKAGE_DIR, { recursive: true, force: true });
+	} catch {
+		// Missing or unreadable; recreate below.
+	}
+
+	await symlink(packageDir, VIRTUAL_PACKAGE_DIR, "dir");
+}
+
+export async function prepareVirtualPackageDir(systemPrompt: string): Promise<void> {
+	const packageDir = extractPackageDirFromSystemPrompt(systemPrompt);
+	if (!packageDir) return;
+	realPackageDir = packageDir;
+	await ensureVirtualPackageDir(packageDir);
+}
+
+export function virtualizePackageDir(text: string): string {
+	if (!realPackageDir) return text;
+	return text.replace(new RegExp(escapeRegExp(realPackageDir), "g"), VIRTUAL_PACKAGE_DIR);
+}
+
+export function sanitizeSystemPrompt(text: string): string {
+	return virtualizePackageDir(text)
+		.replace(/operating inside pi, a coding agent harness\./g, "operating inside a minimal coding agent harness.")
+		.replace(/Pi documentation/g, "Coding agent documentation")
+		.replace(/pi itself/g, "the coding agent framework itself")
+		.replace(/pi packages/g, "coding agent packages")
+		.replace(/pi topics/g, "coding agent topics")
+		.replace(/read pi \.md/g, "read coding-agent .md")
+		.replace(/Create a pi extension/g, "Create a coding agent extension")
+		.replace(/Create a pi skill/g, "Create a coding agent skill")
+		.replace(/to pi\b/g, "to the coding agent framework")
 		.replace(/pi-coding-agent/g, "coding-agent")
 		.replace(/@earendil-works\/pi-ai/g, "@anthropic/ai")
-		.replace(/@earendil-works\/pi-tui/g, "@anthropic/tui")
-		.replace(/about pi\b/g, "about this tool")
-		.replace(/pi update\b/g, "update")
-		.replace(/Run pi update/g, "Run update")
-		.replace(/\bpi\b([\s,.])/g, "the assistant$1");
+		.replace(/@earendil-works\/pi-tui/g, "@anthropic/tui");
+}
+
+export async function patchSystemPayload(payload: Record<string, any>, billingHeader: string): Promise<void> {
+	if (Array.isArray(payload.system)) {
+		const newBlocks: any[] = [{ type: "text", text: billingHeader }];
+
+		for (const block of payload.system) {
+			if (block.type !== "text" || !block.text) { newBlocks.push(block); continue; }
+			if (block.text.startsWith("x-anthropic-billing-header")) continue;
+			if (block.text.startsWith("You are") && block.text.includes("official CLI")) continue;
+
+			await prepareVirtualPackageDir(block.text);
+			newBlocks.push({ ...block, text: sanitizeSystemPrompt(block.text) });
+		}
+
+		payload.system = newBlocks;
+	} else if (typeof payload.system === "string") {
+		await prepareVirtualPackageDir(payload.system);
+		payload.system = [
+			{ type: "text", text: billingHeader },
+			{ type: "text", text: sanitizeSystemPrompt(payload.system) },
+		];
+	}
+}
+
+export function ensureMetadata(payload: Record<string, any>): void {
+	if (!payload.metadata) {
+		payload.metadata = {
+			user_id: JSON.stringify({ device_id: "0", account_uuid: "", session_id: "0" }),
+		};
+	}
+}
+
+export async function patchProviderPayload(
+	payload: Record<string, any>,
+	model: { provider?: string; id?: string } | undefined,
+): Promise<Record<string, any> | undefined> {
+	if (!payload || typeof payload !== "object") return undefined;
+	if (!Array.isArray(payload.messages)) return undefined;
+	if (!isAnthropicTarget(payload, model)) return undefined;
+
+	const billingHeader = buildBillingHeader(payload.messages);
+	await patchSystemPayload(payload, billingHeader);
+	ensureMetadata(payload);
+	return payload;
 }
 
 export default function (pi: ExtensionAPI) {
+	pi.on("before_agent_start", async (event) => {
+		await prepareVirtualPackageDir(event.systemPrompt);
+	});
+
 	pi.on("before_provider_request", async (event, ctx) => {
 		const payload = event.payload as Record<string, any>;
-		if (!payload || typeof payload !== "object") return;
-		if (!Array.isArray(payload.messages)) return;
-		if (!isAnthropicTarget(payload, ctx.model as { provider?: string; id?: string } | undefined)) return;
-
-		// Build billing header with computed version suffix
-		const billingHeader = buildBillingHeader(payload.messages);
-
-		if (Array.isArray(payload.system)) {
-			const newBlocks: any[] = [];
-
-			// Billing header as first block for subscription rate-limit routing
-			newBlocks.push({
-				type: "text",
-				text: billingHeader,
-			});
-
-			for (const block of payload.system) {
-				if (block.type !== "text" || !block.text) { newBlocks.push(block); continue; }
-				if (block.text.startsWith("x-anthropic-billing-header")) continue;
-				if (block.text.startsWith("You are") && block.text.includes("official CLI")) continue;
-
-				newBlocks.push({ ...block, text: sanitizeSystemPrompt(block.text) });
-			}
-
-			payload.system = newBlocks;
-		} else if (typeof payload.system === "string") {
-			payload.system = [
-				{ type: "text", text: billingHeader },
-				{ type: "text", text: sanitizeSystemPrompt(payload.system) },
-			];
-		}
-
-		if (!payload.metadata) {
-			payload.metadata = {
-				user_id: JSON.stringify({ device_id: "0", account_uuid: "", session_id: "0" }),
-			};
-		}
+		const patchedPayload = await patchProviderPayload(
+			payload,
+			ctx.model as { provider?: string; id?: string } | undefined,
+		);
+		if (!patchedPayload) return;
 
 		// Log the sanitized system prompt
 		const sessionFile = ctx.sessionManager.getSessionFile();
@@ -240,7 +321,7 @@ export default function (pi: ExtensionAPI) {
 			}
 		}
 
-		return payload;
+		return patchedPayload;
 	});
 
 	pi.on("session_start", async (_e, ctx) => {
@@ -265,19 +346,8 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			// Parse optional limit argument (default: 10)
-			const limit = args.trim() ? parseInt(args.trim(), 10) : 10;
-			const displayLimit = isNaN(limit) || limit <= 0 ? 10 : limit;
-
-			// Build selection items (most recent first, limited)
-			const reversedEntries = [...entries].reverse().slice(0, displayLimit);
-			const items = reversedEntries.map(
-				(e) => `${formatTimestamp(e.timestamp)} - ${e.model}`
-			);
-
-			const title = entries.length > displayLimit
-				? `System Prompts (${displayLimit} of ${entries.length}, newest first)`
-				: `System Prompts (${entries.length} total, newest first)`;
+			const displayLimit = parseDisplayLimit(args);
+			const { reversedEntries, items, title } = buildSystemPromptSelection(entries, displayLimit);
 			const selected = await ctx.ui.select(title, items);
 			if (selected) {
 				const index = items.indexOf(selected);

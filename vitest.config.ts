@@ -8,7 +8,10 @@ const piNodeModules = path.join(piRoot, "node_modules");
 
 export default defineConfig({
 	test: {
-		include: ["extensions/session-tools/**/*.test.ts"],
+		include: ["extensions/session-tools/**/*.test.ts", "extensions/pi-cc-patch/**/*.test.ts"],
+		coverage: {
+			reporter: ["text"],
+		},
 	},
 	resolve: {
 		alias: {
