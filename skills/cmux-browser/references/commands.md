@@ -1,139 +1,98 @@
-# Browser Command Reference
+# Command Reference (cmux Browser)
 
-Full command mapping for `cmux browser` commands.
+This maps common `agent-browser` usage to `cmux browser` usage.
 
-## Navigation
+## Direct Equivalents
+
+- `agent-browser open <url>` -> `cmux browser open <url>`
+- `agent-browser goto|navigate <url>` -> `cmux browser <surface> goto|navigate <url>`
+- `agent-browser snapshot -i` -> `cmux browser <surface> snapshot --interactive`
+- `agent-browser click <ref>` -> `cmux browser <surface> click <ref>`
+- `agent-browser fill <ref> <text>` -> `cmux browser <surface> fill <ref> <text>`
+- `agent-browser type <ref> <text>` -> `cmux browser <surface> type <ref> <text>`
+- `agent-browser select <ref> <value>` -> `cmux browser <surface> select <ref> <value>`
+- `agent-browser get text <ref>` -> `cmux browser <surface> get text <ref-or-selector>`
+- `agent-browser get url` -> `cmux browser <surface> get url`
+- `agent-browser get title` -> `cmux browser <surface> get title`
+
+## Core Command Groups
+
+### Navigation
 
 ```bash
-cmux browser open <url>                        # opens in caller's workspace
-cmux browser open <url> --workspace <ref>      # opens in specific workspace
+cmux browser open <url>                        # opens in caller's workspace (uses CMUX_WORKSPACE_ID)
+cmux browser open <url> --workspace <id|ref>   # opens in a specific workspace
 cmux browser <surface> goto <url>
-cmux browser <surface> back
-cmux browser <surface> forward
-cmux browser <surface> reload
-cmux browser <surface> get url
-cmux browser <surface> get title
+cmux browser <surface> back|forward|reload
+cmux browser <surface> get url|title
 ```
 
-## Snapshot and Inspection
+> **Workspace context:** `browser open` targets the workspace of the terminal where the command is run (via `CMUX_WORKSPACE_ID`), even if a different workspace is currently focused. Use `--workspace` to override.
+
+### Snapshot and Inspection
 
 ```bash
 cmux browser <surface> snapshot --interactive
 cmux browser <surface> snapshot --interactive --compact --max-depth 3
-cmux browser <surface> snapshot --selector "form#checkout" --interactive
-cmux browser <surface> get text <ref-or-selector>
-cmux browser <surface> get html <ref-or-selector>
-cmux browser <surface> get value <selector>
-cmux browser <surface> get attr <selector> --attr <name>
-cmux browser <surface> get count <selector>
-cmux browser <surface> get box <selector>
-cmux browser <surface> get styles <selector> --property <name>
-cmux browser <surface> eval '<javascript>'
+cmux browser <surface> get text body
+cmux browser <surface> get html body
+cmux browser <surface> get value "#email"
+cmux browser <surface> get attr "#email" --attr placeholder
+cmux browser <surface> get count ".row"
+cmux browser <surface> get box "#submit"
+cmux browser <surface> get styles "#submit" --property color
+cmux browser <surface> eval '<js>'
 ```
 
-## Interaction
+### Interaction
 
 ```bash
-cmux browser <surface> click <ref>
-cmux browser <surface> dblclick <ref>
-cmux browser <surface> hover <ref>
-cmux browser <surface> focus <ref>
-cmux browser <surface> fill <ref> "text"         # clears and sets value
-cmux browser <surface> fill <ref> ""             # clears input
-cmux browser <surface> type <ref> "text"         # types character by character
-cmux browser <surface> press <key>               # Enter, Tab, Escape, etc.
-cmux browser <surface> keydown <key>
-cmux browser <surface> keyup <key>
-cmux browser <surface> select <ref> "value"
-cmux browser <surface> check <ref>
-cmux browser <surface> uncheck <ref>
+cmux browser <surface> click|dblclick|hover|focus <selector-or-ref>
+cmux browser <surface> fill <selector-or-ref> [text]   # empty text clears
+cmux browser <surface> type <selector-or-ref> <text>
+cmux browser <surface> press|keydown|keyup <key>
+cmux browser <surface> select <selector-or-ref> <value>
+cmux browser <surface> check|uncheck <selector-or-ref>
 cmux browser <surface> scroll [--selector <css>] [--dx <n>] [--dy <n>]
-cmux browser <surface> scroll-into-view <ref>
 ```
 
-## Wait
+### Wait
 
 ```bash
 cmux browser <surface> wait --selector "#ready" --timeout-ms 10000
 cmux browser <surface> wait --text "Done" --timeout-ms 10000
 cmux browser <surface> wait --url-contains "/dashboard" --timeout-ms 10000
 cmux browser <surface> wait --load-state complete --timeout-ms 15000
-cmux browser <surface> wait --function "js expression" --timeout-ms 10000
+cmux browser <surface> wait --function "document.readyState === 'complete'" --timeout-ms 10000
 ```
 
-## Session and State
+### Session/State
 
 ```bash
-cmux browser <surface> cookies get
-cmux browser <surface> cookies set <name> <value>
-cmux browser <surface> cookies clear
-cmux browser <surface> storage local get <key>
-cmux browser <surface> storage local set <key> <value>
-cmux browser <surface> storage session get <key>
-cmux browser <surface> storage session set <key> <value>
-cmux browser <surface> storage local clear
-cmux browser <surface> storage session clear
-cmux browser <surface> state save <path>
-cmux browser <surface> state load <path>
+cmux browser <surface> cookies get|set|clear ...
+cmux browser <surface> storage local|session get|set|clear ...
+cmux browser <surface> tab list|new|switch|close ...
+cmux browser <surface> state save|load <path>
 ```
 
-## Browser Tabs
+### Diagnostics
 
 ```bash
-cmux browser <surface> tab list
-cmux browser <surface> tab new <url>
-cmux browser <surface> tab switch <index>
-cmux browser <surface> tab close <index>
-```
-
-## Diagnostics
-
-```bash
-cmux browser <surface> console list
-cmux browser <surface> console clear
-cmux browser <surface> errors list
-cmux browser <surface> errors clear
+cmux browser <surface> console list|clear
+cmux browser <surface> errors list|clear
 cmux browser <surface> highlight <selector>
-cmux browser <surface> screenshot [--path <file>]
+cmux browser <surface> screenshot
 cmux browser <surface> download wait --timeout-ms 10000
 ```
 
-## Profiles
+## Agent Reliability Tips
 
-```bash
-cmux browser profiles list
-cmux browser profiles add <name>
-cmux browser profiles rename <old> <new>
-cmux browser profiles clear <name> [--force]
-cmux browser profiles delete <name>
-cmux browser import [--from <browser>] [--profile <name>] [--domain <domain>]
-```
+- Use `--snapshot-after` on mutating actions to return a fresh post-action snapshot.
+- Re-snapshot after navigation, modal open/close, or major DOM changes.
+- Prefer short handles in outputs by default (`surface:N`, `pane:N`, `workspace:N`, `window:N`).
+- Use `--id-format both` only when a UUID must be logged/exported.
 
-## Advanced
-
-```bash
-cmux browser <surface> find --role button
-cmux browser <surface> find --text "Submit"
-cmux browser <surface> find --label "Email"
-cmux browser <surface> find --testid "submit-btn"
-cmux browser <surface> frame <name-or-url>
-cmux browser <surface> dialog accept|dismiss
-cmux browser <surface> viewport --width 1280 --height 720
-cmux browser <surface> addinitscript '<js>'
-cmux browser <surface> addstyle '<css>'
-cmux browser <surface> identify
-```
-
-## Useful Flags
-
-- `--json` -- machine-readable output
-- `--snapshot-after` -- return fresh snapshot after mutating action
-- `--timeout-ms <ms>` -- timeout for wait operations
-- `--interactive` -- include element refs in snapshot
-- `--compact` -- shorter snapshot output
-- `--max-depth <n>` -- limit DOM depth in snapshot
-
-## Known WKWebView Gaps (not supported)
+## Known WKWebView Gaps (`not_supported`)
 
 - `browser.viewport.set`
 - `browser.geolocation.set`
@@ -142,3 +101,8 @@ cmux browser <surface> identify
 - `browser.network.route|unroute|requests`
 - `browser.screencast.start|stop`
 - `browser.input_mouse|input_keyboard|input_touch`
+
+See also:
+- [snapshot-refs.md](snapshot-refs.md)
+- [authentication.md](authentication.md)
+- [session-management.md](session-management.md)
