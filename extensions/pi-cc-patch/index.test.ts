@@ -186,7 +186,7 @@ describe("buildBillingHeader", () => {
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.114.89d; cc_entrypoint=cli; cch=00000;"
+			"x-anthropic-billing-header: cc_version=2.1.156.ac6; cc_entrypoint=cli; cch=00000;"
 		);
 	});
 
@@ -206,7 +206,7 @@ describe("buildBillingHeader", () => {
 		const messages = [{ role: "assistant", content: "Hello" }];
 		const header = buildBillingHeader(messages);
 
-		assert.match(header, /cc_version=2\.1\.114\.000/);
+		assert.match(header, /cc_version=2\.1\.156\.000/);
 	});
 
 	it("should include all required header components", () => {
@@ -214,7 +214,7 @@ describe("buildBillingHeader", () => {
 		const header = buildBillingHeader(messages);
 
 		assert.match(header, /x-anthropic-billing-header:/);
-		assert.match(header, /cc_version=2\.1\.114\.[0-9a-f]{3}/);
+		assert.match(header, /cc_version=2\.1\.156\.[0-9a-f]{3}/);
 		assert.match(header, /cc_entrypoint=cli/);
 		assert.match(header, /cch=00000/);
 	});
@@ -241,8 +241,8 @@ describe("integration: verified against Claude Code", () => {
 	});
 
 	it("should match Claude Code billing header for 'What day is it?'", () => {
-		// Verified from /tmp/claude-debug-3.log:
-		// attribution header x-anthropic-billing-header: cc_version=2.1.114.89d; cc_entrypoint=cli; cch=00000;
+		// Verified from Claude Code CLI 2.1.156 audit:
+		// attribution header x-anthropic-billing-header: cc_version=2.1.156.ac6; cc_entrypoint=cli; cch=00000;
 		// First user message: "What day is it?"
 
 		const messages = [{ role: "user", content: "What day is it?" }];
@@ -250,7 +250,7 @@ describe("integration: verified against Claude Code", () => {
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.114.89d; cc_entrypoint=cli; cch=00000;"
+			"x-anthropic-billing-header: cc_version=2.1.156.ac6; cc_entrypoint=cli; cch=00000;"
 		);
 	});
 
@@ -408,7 +408,7 @@ describe("provider payload patching", () => {
 
 		assert.strictEqual(result, payload);
 		assert.strictEqual(payload.system.length, 2);
-		assert.match(payload.system[0].text, /^x-anthropic-billing-header: cc_version=2\.1\.114\.89d/);
+		assert.match(payload.system[0].text, /^x-anthropic-billing-header: cc_version=2\.1\.156\.ac6/);
 		assert.strictEqual(payload.system[1].text, "You are operating inside a minimal coding agent harness.");
 		assert.deepStrictEqual(JSON.parse(payload.metadata.user_id), { device_id: "0", account_uuid: "", session_id: "0" });
 	});
@@ -650,7 +650,7 @@ describe("extension registration", () => {
 
 		assert.deepStrictEqual(ui.notify.mock.calls[0], ["cc-patch: loaded (anthropic-only)", "info"]);
 		const header = buildBillingHeader([{ role: "user", content: "Second message" }]);
-		assert.match(header, new RegExp(`cc_version=2\\.1\\.114\\.${computeVersionSuffix("Second message")}`));
+		assert.match(header, new RegExp(`cc_version=2\\.1\\.156\\.${computeVersionSuffix("Second message")}`));
 	});
 
 	it("debug command handles no session file and no entries", async () => {
