@@ -21,14 +21,14 @@ Verify the installed Claude Code CLI's billing header construction against the e
 2. Search the current and previous binaries for billing-header markers.
 
    ```bash
-   rg -a -n "cc_version|cc_entrypoint|x-anthropic-billing-header|59cf53e54c78|cc_workload" \
+   rg -a -n "cc_version|cc_entrypoint|x-anthropic-billing-header|59cf53e54c78|cc_workload|cc_is_subagent" \
      ~/.local/share/claude/versions/<version>
    ```
 
    If output is too large, use byte offsets:
 
    ```bash
-   grep -aob 'x-anthropic-billing-header\|cc_version\|cc_entrypoint\|59cf53e54c78\|cc_workload' \
+   grep -aob 'x-anthropic-billing-header\|cc_version\|cc_entrypoint\|59cf53e54c78\|cc_workload\|cc_is_subagent' \
      ~/.local/share/claude/versions/<version>
    ```
 
@@ -57,6 +57,7 @@ Verify the installed Claude Code CLI's billing header construction against the e
    - Entrypoint: normal CLI sessions set `CLAUDE_CODE_ENTRYPOINT="cli"`; SDK/remote/desktop paths may differ.
    - `cch=00000;`: currently present for first-party Anthropic/OAuth, omitted for some providers such as Bedrock/AWS/Mantle.
    - Optional `cc_workload=...;` may appear when a workload is set.
+   - Optional `cc_is_subagent=true;` may appear for non-main subagent sessions.
 
 5. Compute expected suffixes for test fixtures.
 

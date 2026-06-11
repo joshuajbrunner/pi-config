@@ -17,7 +17,7 @@ No token swap, no SDK dependency, no proxy. Just a `before_provider_request` hoo
 The billing header uses Claude Code's exact algorithm for the version suffix:
 
 ```
-x-anthropic-billing-header: cc_version=2.1.156.{suffix}; cc_entrypoint=cli; cch=00000;
+x-anthropic-billing-header: cc_version=2.1.173.{suffix}; cc_entrypoint=cli; cch=00000;
 ```
 
 Where `{suffix}` is computed as:
@@ -27,9 +27,16 @@ suffix = sha256(SALT + chars[4,7,20] + VERSION).slice(0, 3)
 
 - **SALT**: `59cf53e54c78` (extracted from Claude Code binary)
 - **chars[4,7,20]**: Characters at positions 4, 7, 20 of the first user message (or "0" if missing)
-- **VERSION**: Current Claude Code version (e.g., `2.1.156`)
+- **VERSION**: Current Claude Code version (e.g., `2.1.173`)
+- **ENTRYPOINT**: Normal Claude Code CLI sessions use `cli`
 
-This makes the billing header indistinguishable from real Claude Code requests.
+Claude Code 2.1.173 also supports optional billing-header fields that this extension does not currently emit for the normal main CLI path:
+
+- `cc_workload={value};` when a workload tag is set
+- `cc_is_subagent=true;` for non-main subagent sessions
+- `cch=00000;` is omitted for some non-first-party providers such as Bedrock/AWS/Mantle
+
+This makes the billing header match normal main-session Claude Code CLI requests.
 
 ## Important: Disable Extra Usage
 
