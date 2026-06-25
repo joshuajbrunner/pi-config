@@ -14,6 +14,7 @@ export type SummaryMode = "short" | "full";
 export type BrowserSession = SessionInfo & {
 	latestSummary?: string;
 	latestSummaryPath?: string;
+	summarizedAt?: Date;
 	parsedSummary?: ParsedSummary;
 	metrics?: SessionMetrics;
 	isCurrent?: boolean;

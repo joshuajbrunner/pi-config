@@ -1,4 +1,6 @@
 import { SessionManager, type ExtensionAPI, type ExtensionCommandContext, type SessionInfo } from "@earendil-works/pi-coding-agent";
+import path from "node:path";
+import { SUMMARY_FILE_EXTENSION, SUMMARY_FILE_PREFIX } from "./config";
 import { buildConversationTextFromSessionFile } from "./conversation-extract";
 import { createSummary } from "./summary-model";
 import { loadSessionMetrics } from "./session-metrics";
@@ -7,6 +9,29 @@ import { appendSummaryDebugLogForSession, loadLatestSummary, saveSummaryForSessi
 import { showSummaryUi } from "./summary-ui";
 import { SessionBrowserComponent, type SessionBrowserResult } from "./session-browser-component";
 import type { BrowserSession, SummaryMode } from "./types";
+
+function summarizedAtFromPath(summaryPath: string | undefined): Date | undefined {
+	if (!summaryPath) return undefined;
+
+	const fileName = path.basename(summaryPath);
+	if (!fileName.startsWith(SUMMARY_FILE_PREFIX) || !fileName.endsWith(SUMMARY_FILE_EXTENSION)) return undefined;
+
+	const stamp = fileName.slice(SUMMARY_FILE_PREFIX.length, -SUMMARY_FILE_EXTENSION.length).replace(/-\d+$/, "");
+	const match = stamp.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/);
+	if (!match) return undefined;
+
+	const [, year, month, day, hour, minute, second, millisecond] = match;
+	return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second), Number(millisecond)));
+}
+
+function sortSessionsForBrowser(a: BrowserSession, b: BrowserSession): number {
+	const aSummarized = a.summarizedAt?.getTime();
+	const bSummarized = b.summarizedAt?.getTime();
+	if (aSummarized !== undefined && bSummarized !== undefined) return bSummarized - aSummarized;
+	if (aSummarized !== undefined) return -1;
+	if (bSummarized !== undefined) return 1;
+	return b.modified.getTime() - a.modified.getTime();
+}
 
 async function withSummaries(sessions: SessionInfo[], currentSessionId?: string, currentSessionFile?: string): Promise<BrowserSession[]> {
 	return Promise.all(
@@ -19,6 +44,7 @@ async function withSummaries(sessions: SessionInfo[], currentSessionId?: string,
 				...session,
 				latestSummary: savedSummary?.content,
 				latestSummaryPath: savedSummary?.path,
+				summarizedAt: summarizedAtFromPath(savedSummary?.path),
 				parsedSummary: savedSummary ? parseSummary(savedSummary.content) : undefined,
 				metrics,
 				isCurrent: session.id === currentSessionId || session.path === currentSessionFile,
@@ -59,6 +85,7 @@ export async function summarizeBrowserSession(
 		...session,
 		latestSummary: savedSummary?.content,
 		latestSummaryPath: savedSummary?.path,
+		summarizedAt: summarizedAtFromPath(savedSummary?.path),
 		parsedSummary: savedSummary ? parseSummary(savedSummary.content) : undefined,
 		metrics,
 	};
@@ -91,9 +118,7 @@ export function registerSessionBrowserCommand(pi: ExtensionAPI): void {
 					sessionInfos,
 					ctx.sessionManager.getSessionId(),
 					ctx.sessionManager.getSessionFile(),
-				)).sort(
-					(a, b) => b.modified.getTime() - a.modified.getTime(),
-				);
+				)).sort(sortSessionsForBrowser);
 
 				const selected = await ctx.ui.custom<SessionBrowserResult>(
 					(tui, theme, _kb, done) =>

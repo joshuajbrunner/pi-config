@@ -134,6 +134,31 @@ describe("session-browser command", () => {
 		await expect(summarizeBrowserSession({ id: "s1", path: "/tmp/session.jsonl" } as any, "short", {} as any)).rejects.toThrow("No conversation text");
 	});
 
+	it("orders summarized sessions first by latest summary time", async () => {
+		const olderModified = new Date("2026-01-05T00:00:00Z");
+		const sessions = [
+			{ id: "unsummarized", name: "Unsummarized", path: "/tmp/unsummarized.jsonl", created: olderModified, modified: olderModified, firstMessage: "latest edit", messageCount: 1 },
+			{ id: "older-summary", name: "Older summary", path: "/tmp/older.jsonl", created: olderModified, modified: olderModified, firstMessage: "older", messageCount: 1 },
+			{ id: "newer-summary", name: "Newer summary", path: "/tmp/newer.jsonl", created: olderModified, modified: olderModified, firstMessage: "newer", messageCount: 1 },
+		];
+		list.mockResolvedValue(sessions);
+		loadLatestSummary.mockImplementation(async (sessionPath: string) => {
+			if (sessionPath === "/tmp/older.jsonl") return { path: "/tmp/older-summary/summary-2026-01-02T00-00-00-000Z.md", content: "Older summary" };
+			if (sessionPath === "/tmp/newer.jsonl") return { path: "/tmp/newer-summary/summary-2026-01-03T00-00-00-000Z.md", content: "Newer summary" };
+			return undefined;
+		});
+		let handler: ((args: string, ctx: any) => Promise<void>) | undefined;
+		registerSessionBrowserCommand({ registerCommand: (_name: string, command: any) => { handler = command.handler; } } as any);
+
+		const custom = vi.fn(async (factory) => {
+			const component = factory({ requestRender: vi.fn() }, { fg: (_color: string, text: string) => text }, undefined, vi.fn());
+			expect((component as any).sessions.map((session: any) => session.id)).toEqual(["newer-summary", "older-summary", "unsummarized"]);
+			return undefined;
+		});
+
+		await handler!("", { cwd: "/tmp", sessionManager: { getSessionId: () => "current", getSessionFile: () => "/tmp/current.jsonl" }, waitForIdle: vi.fn(), ui: { notify: vi.fn(), custom }, switchSession: vi.fn() });
+	});
+
 	it("uses listAll when args include all", async () => {
 		listAll.mockResolvedValue([]);
 		let handler: ((args: string, ctx: any) => Promise<void>) | undefined;
