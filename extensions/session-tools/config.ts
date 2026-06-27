@@ -1,6 +1,6 @@
 export const SUMMARY_MODEL_CANDIDATES = [
-	{ provider: "openai-codex", model: "gpt-5.5" },
-	{ provider: "anthropic", model: "claude-sonnet-4-5" },
+	{ provider: "anthropic", model: "claude-sonnet-4-6" },
+	{ provider: "openai-codex", model: "gpt-5.4" },
 ] as const;
 
 export const SUMMARY_FILE_PREFIX = "summary-";
