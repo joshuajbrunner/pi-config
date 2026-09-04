@@ -28,24 +28,32 @@ vi.mock("node:fs/promises", async (importActual) => {
 	};
 });
 import ccPatch, {
+	REQUEST_STATE_ENTRY_TYPE,
 	VIRTUAL_PACKAGE_DIR,
 	buildBillingHeader,
 	buildSystemPromptSelection,
+	captureRequestId,
 	computeVersionSuffix,
 	ensureMetadata,
 	ensureVirtualPackageDir,
 	escapeRegExp,
 	extractFirstUserMessage,
 	extractPackageDirFromSystemPrompt,
+	getRequestState,
 	isAnthropicTarget,
+	isFirstPartyAnthropicTarget,
+	logProviderResponseHeaders,
 	logSystemPrompt,
 	patchProviderPayload,
 	parseDisplayLimit,
 	patchSystemPayload,
 	readSystemPrompts,
 	prepareVirtualPackageDir,
+	resetRequestState,
 	resetVersionSuffixCache,
+	restoreRequestState,
 	sanitizeSystemPrompt,
+	startPrompt,
 	systemPromptToString,
 	virtualizePackageDir,
 } from "./index";
@@ -178,6 +186,7 @@ describe("extractFirstUserMessage", () => {
 describe("buildBillingHeader", () => {
 	beforeEach(() => {
 		resetVersionSuffixCache();
+		resetRequestState();
 	});
 
 	it("should build header with computed suffix", () => {
@@ -186,7 +195,7 @@ describe("buildBillingHeader", () => {
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.220.f15; cc_entrypoint=cli; cch=00000;"
+			"x-anthropic-billing-header: cc_version=2.1.260.dfa; cc_entrypoint=cli; cch=00000;"
 		);
 	});
 
@@ -206,7 +215,7 @@ describe("buildBillingHeader", () => {
 		const messages = [{ role: "assistant", content: "Hello" }];
 		const header = buildBillingHeader(messages);
 
-		assert.match(header, /cc_version=2\.1\.220\.000/);
+		assert.match(header, /cc_version=2\.1\.260\.000/);
 	});
 
 	it("should include all required header components", () => {
@@ -214,9 +223,91 @@ describe("buildBillingHeader", () => {
 		const header = buildBillingHeader(messages);
 
 		assert.match(header, /x-anthropic-billing-header:/);
-		assert.match(header, /cc_version=2\.1\.220\.[0-9a-f]{3}/);
+		assert.match(header, /cc_version=2\.1\.260\.[0-9a-f]{3}/);
 		assert.match(header, /cc_entrypoint=cli/);
 		assert.match(header, /cch=00000/);
+	});
+});
+
+describe("Claude Code request state", () => {
+	beforeEach(() => {
+		resetRequestState();
+		resetVersionSuffixCache();
+	});
+
+	it("generates one prompt ID while retaining the previous request ID", () => {
+		captureRequestId({ "request-id": "req_previous" });
+		const state = startPrompt("550e8400-e29b-41d4-a716-446655440000");
+
+		assert.deepStrictEqual(state, {
+			promptId: "550e8400-e29b-41d4-a716-446655440000",
+			requestId: "req_previous",
+		});
+		assert.deepStrictEqual(getRequestState(), state);
+	});
+
+	it("captures validated request IDs from normalized response headers", () => {
+		startPrompt("550e8400-e29b-41d4-a716-446655440000");
+		assert.deepStrictEqual(captureRequestId({ "request-id": "req_primary" }), {
+			promptId: "550e8400-e29b-41d4-a716-446655440000",
+			requestId: "req_primary",
+		});
+		assert.deepStrictEqual(captureRequestId({ "x-request-id": "req_not_used" }), {
+			promptId: "550e8400-e29b-41d4-a716-446655440000",
+			requestId: null,
+		});
+		assert.deepStrictEqual(captureRequestId({ "request-id": "msg_not_a_request" }), {
+			promptId: "550e8400-e29b-41d4-a716-446655440000",
+			requestId: null,
+		});
+	});
+
+	it("restores the latest valid state from the active branch", () => {
+		const first = {
+			type: "custom",
+			customType: REQUEST_STATE_ENTRY_TYPE,
+			data: { promptId: "550e8400-e29b-41d4-a716-446655440000", requestId: "req_first" },
+		};
+		const latest = {
+			type: "custom",
+			customType: REQUEST_STATE_ENTRY_TYPE,
+			data: { promptId: "123e4567-e89b-12d3-a456-426614174000", requestId: "req_latest" },
+		};
+
+		assert.deepStrictEqual(restoreRequestState([first, { type: "message" }, latest]), latest.data);
+		assert.deepStrictEqual(restoreRequestState([]), { promptId: null, requestId: null });
+	});
+
+	it("emits validated request state in Claude Code field order", () => {
+		startPrompt("550e8400-e29b-41d4-a716-446655440000");
+		captureRequestId({ "request-id": "req_previous" });
+		const header = buildBillingHeader([{ role: "user", content: "Hello" }]);
+
+		assert.strictEqual(
+			header,
+			"x-anthropic-billing-header: cc_version=2.1.260.7a1; cc_entrypoint=cli; cch=00000; cc_prev_req=req_previous; cc_prompt_id=550e8400-e29b-41d4-a716-446655440000;",
+		);
+	});
+
+	it("omits cc_prev_req on the first request of a session", () => {
+		startPrompt("550e8400-e29b-41d4-a716-446655440000");
+		const header = buildBillingHeader([{ role: "user", content: "Hello" }]);
+
+		assert.doesNotMatch(header, /cc_prev_req/);
+		assert.match(header, /cc_prompt_id=550e8400-e29b-41d4-a716-446655440000;/);
+	});
+
+	it("omits request state when explicitly disabled or invalid", () => {
+		startPrompt("550e8400-e29b-41d4-a716-446655440000");
+		captureRequestId({ "request-id": "req_previous" });
+		const disabled = buildBillingHeader([{ role: "user", content: "Hello" }], null);
+		const invalid = buildBillingHeader(
+			[{ role: "user", content: "Hello" }],
+			{ promptId: "not-a-uuid", requestId: "msg_not_a_request" },
+		);
+
+		assert.doesNotMatch(disabled, /cc_prompt_id|cc_prev_req/);
+		assert.doesNotMatch(invalid, /cc_prompt_id|cc_prev_req/);
 	});
 });
 
@@ -238,11 +329,11 @@ describe("resetVersionSuffixCache", () => {
 describe("integration: verified against Claude Code", () => {
 	beforeEach(() => {
 		resetVersionSuffixCache();
+		resetRequestState();
 	});
 
 	it("should match Claude Code billing header for 'What day is it?'", () => {
-		// Verified from Claude Code CLI 2.1.220 audit:
-		// attribution header x-anthropic-billing-header: cc_version=2.1.220.f15; cc_entrypoint=cli; cch=00000;
+		// Verified against the Claude Code CLI 2.1.260 billing-header algorithm.
 		// First user message: "What day is it?"
 
 		const messages = [{ role: "user", content: "What day is it?" }];
@@ -250,7 +341,7 @@ describe("integration: verified against Claude Code", () => {
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.220.f15; cc_entrypoint=cli; cch=00000;"
+			"x-anthropic-billing-header: cc_version=2.1.260.dfa; cc_entrypoint=cli; cch=00000;"
 		);
 	});
 
@@ -370,6 +461,7 @@ Pi documentation (read only when the user asks about pi itself, its SDK, extensi
 describe("provider payload patching", () => {
 	beforeEach(() => {
 		resetVersionSuffixCache();
+		resetRequestState();
 		vi.mocked(lstat).mockReset();
 		vi.mocked(readlink).mockReset();
 		vi.mocked(rm).mockReset();
@@ -378,11 +470,26 @@ describe("provider payload patching", () => {
 		vi.mocked(symlink).mockResolvedValue(undefined);
 	});
 
-	it("detects Anthropic targets from provider, model id, or payload model", () => {
+	it("detects Anthropic payloads separately from the first-party endpoint", () => {
 		assert.strictEqual(isAnthropicTarget({}, { provider: "anthropic" }), true);
 		assert.strictEqual(isAnthropicTarget({}, { id: "claude-3-5-sonnet" }), true);
 		assert.strictEqual(isAnthropicTarget({ model: "claude-opus" }, undefined), true);
 		assert.strictEqual(isAnthropicTarget({ model: "gpt-4" }, { provider: "openai", id: "gpt-4" }), false);
+
+		assert.strictEqual(isFirstPartyAnthropicTarget({
+			provider: "anthropic",
+			baseUrl: "https://api.anthropic.com",
+		}), true);
+		assert.strictEqual(isFirstPartyAnthropicTarget({
+			provider: "anthropic",
+			baseUrl: "https://proxy.example.com/anthropic",
+		}), false);
+		assert.strictEqual(isFirstPartyAnthropicTarget({
+			provider: "amazon-bedrock",
+			id: "claude-sonnet",
+			baseUrl: "https://api.anthropic.com",
+		}), false);
+		assert.strictEqual(isFirstPartyAnthropicTarget({ provider: "anthropic" }), false);
 	});
 
 	it("escapes regexp metacharacters before virtualizing package dirs", async () => {
@@ -408,9 +515,33 @@ describe("provider payload patching", () => {
 
 		assert.strictEqual(result, payload);
 		assert.strictEqual(payload.system.length, 2);
-		assert.match(payload.system[0].text, /^x-anthropic-billing-header: cc_version=2\.1\.220\.f15/);
+		assert.match(payload.system[0].text, /^x-anthropic-billing-header: cc_version=2\.1\.260\.dfa/);
 		assert.strictEqual(payload.system[1].text, "You are operating inside a minimal coding agent harness.");
 		assert.deepStrictEqual(JSON.parse(payload.metadata.user_id), { device_id: "0", account_uuid: "", session_id: "0" });
+	});
+
+	it("emits request attribution only for first-party Anthropic", async () => {
+		startPrompt("550e8400-e29b-41d4-a716-446655440000");
+		captureRequestId({ "request-id": "req_previous" });
+		const makePayload = (): Record<string, any> => ({
+			model: "claude-sonnet",
+			messages: [{ role: "user", content: "Hello" }],
+			system: "system",
+		});
+
+		const firstParty = makePayload();
+		await patchProviderPayload(firstParty, {
+			provider: "anthropic",
+			baseUrl: "https://api.anthropic.com",
+		});
+		assert.match(firstParty.system[0].text, /cc_prev_req=req_previous; cc_prompt_id=550e8400-e29b-41d4-a716-446655440000;$/);
+
+		const proxy = makePayload();
+		await patchProviderPayload(proxy, {
+			provider: "anthropic",
+			baseUrl: "https://proxy.example.com/anthropic",
+		});
+		assert.doesNotMatch(proxy.system[0].text, /cc_prev_req|cc_prompt_id/);
 	});
 
 	it("patches array system prompts and removes duplicate billing and identity blocks", async () => {
@@ -509,6 +640,35 @@ describe("system prompt log helpers", () => {
 });
 
 
+describe("provider response header logging", () => {
+	const sessionFile = "/tmp/session/test-session.jsonl";
+	const logFile = "/tmp/session/test-session/provider-response-headers.jsonl";
+
+	beforeEach(() => {
+		vi.mocked(readFile).mockReset();
+		vi.mocked(mkdir).mockReset();
+		vi.mocked(writeFile).mockReset();
+		vi.mocked(mkdir).mockResolvedValue(undefined as any);
+		vi.mocked(writeFile).mockResolvedValue(undefined);
+	});
+
+	it("writes normalized provider response headers to the session data directory", async () => {
+		vi.mocked(readFile).mockRejectedValue(new Error("missing"));
+
+		await logProviderResponseHeaders(sessionFile, 200, {
+			"request-id": "req_abc123",
+			"anthropic-ratelimit-requests-remaining": "49",
+		});
+
+		assert.deepStrictEqual(vi.mocked(mkdir).mock.calls[0], ["/tmp/session/test-session", { recursive: true }]);
+		assert.strictEqual(vi.mocked(writeFile).mock.calls[0][0], logFile);
+		const written = JSON.parse(String(vi.mocked(writeFile).mock.calls[0][1]).trim());
+		assert.strictEqual(written.status, 200);
+		assert.strictEqual(written.headers["request-id"], "req_abc123");
+	});
+});
+
+
 describe("system prompt log persistence", () => {
 	const sessionFile = "/tmp/session/test-session.jsonl";
 	const logFile = "/tmp/session/test-session/system-prompts.jsonl";
@@ -578,15 +738,18 @@ describe("extension registration", () => {
 	function createPiHarness() {
 		const handlers = new Map<string, Function>();
 		const commands = new Map<string, any>();
+		const entries: Array<{ customType: string; data: unknown }> = [];
 		const pi = {
 			on: vi.fn((event: string, handler: Function) => handlers.set(event, handler)),
+			appendEntry: vi.fn((customType: string, data: unknown) => entries.push({ customType, data })),
 			registerCommand: vi.fn((name: string, command: any) => commands.set(name, command)),
 		};
 		ccPatch(pi as any);
-		return { handlers, commands, pi };
+		return { handlers, commands, entries, pi };
 	}
 
 	beforeEach(() => {
+		resetRequestState();
 		resetVersionSuffixCache();
 		vi.mocked(lstat).mockReset();
 		vi.mocked(symlink).mockReset();
@@ -601,14 +764,30 @@ describe("extension registration", () => {
 
 	it("registers expected handlers and command", () => {
 		const { handlers, commands } = createPiHarness();
-		assert.deepStrictEqual([...handlers.keys()], ["before_agent_start", "before_provider_request", "session_start"]);
+		assert.deepStrictEqual([...handlers.keys()], ["before_agent_start", "before_provider_request", "after_provider_response", "session_start", "session_tree"]);
 		assert.strictEqual(commands.has("debug-system-prompts"), true);
 	});
 
 	it("prepares virtual docs dir before agent start", async () => {
 		const { handlers } = createPiHarness();
-		await handlers.get("before_agent_start")!({ systemPrompt: "- Main documentation: /real/pkg/README.md" });
+		await handlers.get("before_agent_start")!(
+			{ systemPrompt: "- Main documentation: /real/pkg/README.md" },
+			{ model: { provider: "openai" } },
+		);
 		assert.deepStrictEqual(vi.mocked(symlink).mock.calls[0], ["/real/pkg", VIRTUAL_PACKAGE_DIR, "dir"]);
+	});
+
+	it("starts and persists prompt state for an Anthropic human turn", async () => {
+		const { handlers, entries } = createPiHarness();
+		await handlers.get("before_agent_start")!(
+			{ systemPrompt: "system" },
+			{ model: { provider: "anthropic", id: "claude-sonnet", baseUrl: "https://api.anthropic.com" } },
+		);
+
+		assert.strictEqual(entries.length, 1);
+		assert.strictEqual(entries[0].customType, REQUEST_STATE_ENTRY_TYPE);
+		assert.match((entries[0].data as any).promptId, /^[0-9a-f-]{36}$/);
+		assert.strictEqual((entries[0].data as any).requestId, null);
 	});
 
 	it("patches provider requests and logs sanitized prompts", async () => {
@@ -641,16 +820,99 @@ describe("extension registration", () => {
 		assert.strictEqual(await handlers.get("before_provider_request")!({ payload }, ctx), payload);
 	});
 
-	it("resets cache and notifies on session start", async () => {
+	it("emits one prompt ID across a provider continuation and advances cc_prev_req", async () => {
+		vi.mocked(readFile).mockRejectedValue(new Error("missing"));
+		const { handlers, entries } = createPiHarness();
+		const ctx = {
+			model: { provider: "anthropic", id: "claude-sonnet", baseUrl: "https://api.anthropic.com" },
+			sessionManager: { getSessionFile: () => "/tmp/session/test.jsonl" },
+		};
+
+		await handlers.get("before_agent_start")!({ systemPrompt: "system" }, ctx);
+		const promptId = (entries[0].data as any).promptId;
+
+		const first: Record<string, any> = {
+			model: "claude",
+			messages: [{ role: "user", content: "Hello" }],
+			system: "system",
+		};
+		await handlers.get("before_provider_request")!({ payload: first }, ctx);
+		assert.doesNotMatch(first.system[0].text, /cc_prev_req/);
+		assert.match(first.system[0].text, new RegExp(`cc_prompt_id=${promptId};$`));
+
+		await handlers.get("after_provider_response")!(
+			{ status: 200, headers: { "request-id": "req_first" } },
+			ctx,
+		);
+
+		const continuation: Record<string, any> = {
+			model: "claude",
+			messages: [{ role: "user", content: "Hello" }],
+			system: "system",
+		};
+		await handlers.get("before_provider_request")!({ payload: continuation }, ctx);
+		assert.match(continuation.system[0].text, new RegExp(`cc_prev_req=req_first; cc_prompt_id=${promptId};$`));
+	});
+
+	it("logs and persists validated Anthropic response request IDs", async () => {
+		vi.mocked(readFile).mockRejectedValue(new Error("missing"));
+		const { handlers, entries } = createPiHarness();
+		const ctx = {
+			model: { provider: "anthropic", id: "claude-sonnet", baseUrl: "https://api.anthropic.com" },
+			sessionManager: { getSessionFile: () => "/tmp/session/test.jsonl" },
+		};
+
+		await handlers.get("after_provider_response")!(
+			{ status: 200, headers: { "request-id": "req_observed" } },
+			ctx,
+		);
+
+		assert.strictEqual(entries.length, 1);
+		assert.deepStrictEqual(entries[0], {
+			customType: REQUEST_STATE_ENTRY_TYPE,
+			data: { promptId: null, requestId: "req_observed" },
+		});
+		assert.strictEqual(vi.mocked(writeFile).mock.calls.length, 1);
+		assert.match(String(vi.mocked(writeFile).mock.calls[0][0]), /provider-response-headers\.jsonl$/);
+		assert.match(String(vi.mocked(writeFile).mock.calls[0][1]), /req_observed/);
+
+		vi.mocked(writeFile).mockClear();
+		await handlers.get("after_provider_response")!(
+			{ status: 200, headers: { "request-id": "not-anthropic" } },
+			{ ...ctx, model: { provider: "openai", id: "gpt" } },
+		);
+		assert.strictEqual(vi.mocked(writeFile).mock.calls.length, 0);
+	});
+
+	it("restores request state, resets the suffix cache, and notifies on session start", async () => {
 		buildBillingHeader([{ role: "user", content: "First message" }]);
 		const { handlers } = createPiHarness();
 		const ui = { notify: vi.fn() };
+		const branch = [{
+			type: "custom",
+			customType: REQUEST_STATE_ENTRY_TYPE,
+			data: { promptId: "550e8400-e29b-41d4-a716-446655440000", requestId: "req_resumed" },
+		}];
 
-		await handlers.get("session_start")!({}, { ui });
+		await handlers.get("session_start")!({}, { ui, sessionManager: { getBranch: () => branch } });
 
 		assert.deepStrictEqual(ui.notify.mock.calls[0], ["cc-patch: loaded (anthropic-only)", "info"]);
+		assert.deepStrictEqual(getRequestState(), branch[0].data);
 		const header = buildBillingHeader([{ role: "user", content: "Second message" }]);
-		assert.match(header, new RegExp(`cc_version=2\\.1\\.220\\.${computeVersionSuffix("Second message")}`));
+		assert.match(header, new RegExp(`cc_version=2\\.1\\.260\\.${computeVersionSuffix("Second message")}`));
+	});
+
+	it("restores request state after session tree navigation", async () => {
+		const { handlers } = createPiHarness();
+		const branch = [{
+			type: "custom",
+			customType: REQUEST_STATE_ENTRY_TYPE,
+			data: { promptId: "123e4567-e89b-12d3-a456-426614174000", requestId: "req_branch" },
+		}];
+
+		await handlers.get("session_tree")!({}, { sessionManager: { getBranch: () => branch } });
+
+		assert.deepStrictEqual(getRequestState(), branch[0].data);
 	});
 
 	it("debug command handles no session file and no entries", async () => {

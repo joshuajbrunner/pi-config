@@ -17,22 +17,45 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 const SYSTEM_PROMPT_LOG = "system-prompts.jsonl";
+const PROVIDER_RESPONSE_HEADERS_LOG = "provider-response-headers.jsonl";
+export const REQUEST_STATE_ENTRY_TYPE = "cc-patch-request-state";
+const PROMPT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const REQUEST_ID_PATTERN = /^req_[A-Za-z0-9_-]{1,36}$/;
 const MAX_LOG_ENTRIES = 50;
 export const VIRTUAL_PACKAGE_DIR = "/tmp/coding-agent";
 
 // Billing header constants (extracted from Claude Code binary)
 const BILLING_SALT = "59cf53e54c78";
-const CC_VERSION = "2.1.220";
+const CC_VERSION = "2.1.260";
 const CC_ENTRYPOINT = "cli";
 
 // Session-level cache for the version suffix (reset on session_start)
 let cachedVersionSuffix: string | null = null;
 let realPackageDir: string | null = null;
+
+export interface CcRequestState {
+	promptId: string | null;
+	requestId: string | null;
+}
+
+interface SessionEntryLike {
+	type: string;
+	customType?: string;
+	data?: unknown;
+}
+
+interface ModelTarget {
+	provider?: string;
+	id?: string;
+	baseUrl?: string;
+}
+
+let requestState: CcRequestState = { promptId: null, requestId: null };
 
 /**
  * Computes the version suffix using Claude Code's algorithm.
@@ -66,13 +89,24 @@ export function extractFirstUserMessage(messages: any[]): string | null {
 /**
  * Builds the billing header string with the computed version suffix.
  */
-export function buildBillingHeader(messages: any[]): string {
+export function buildBillingHeader(
+	messages: any[],
+	state: CcRequestState | null = requestState,
+): string {
 	// Compute suffix on first call, then cache for session
 	if (cachedVersionSuffix === null) {
 		const firstMsg = extractFirstUserMessage(messages);
 		cachedVersionSuffix = firstMsg ? computeVersionSuffix(firstMsg) : "000";
 	}
-	return `x-anthropic-billing-header: cc_version=${CC_VERSION}.${cachedVersionSuffix}; cc_entrypoint=${CC_ENTRYPOINT}; cch=00000;`;
+
+	let header = `x-anthropic-billing-header: cc_version=${CC_VERSION}.${cachedVersionSuffix}; cc_entrypoint=${CC_ENTRYPOINT}; cch=00000;`;
+	if (state?.requestId && REQUEST_ID_PATTERN.test(state.requestId)) {
+		header += ` cc_prev_req=${state.requestId};`;
+	}
+	if (state?.promptId && PROMPT_ID_PATTERN.test(state.promptId)) {
+		header += ` cc_prompt_id=${state.promptId};`;
+	}
+	return header;
 }
 
 /**
@@ -82,10 +116,59 @@ export function resetVersionSuffixCache(): void {
 	cachedVersionSuffix = null;
 }
 
+export function getRequestState(): CcRequestState {
+	return { ...requestState };
+}
+
+export function resetRequestState(): void {
+	requestState = { promptId: null, requestId: null };
+}
+
+export function startPrompt(promptId: string = randomUUID()): CcRequestState {
+	if (!PROMPT_ID_PATTERN.test(promptId)) throw new Error("Invalid Claude Code prompt ID");
+	requestState = { promptId, requestId: requestState.requestId };
+	return getRequestState();
+}
+
+export function captureRequestId(headers: Record<string, string>): CcRequestState {
+	const candidate = headers["request-id"];
+	const requestId = candidate && REQUEST_ID_PATTERN.test(candidate) ? candidate : null;
+	requestState = { ...requestState, requestId };
+	return getRequestState();
+}
+
+export function restoreRequestState(entries: SessionEntryLike[]): CcRequestState {
+	resetRequestState();
+	for (let index = entries.length - 1; index >= 0; index--) {
+		const entry = entries[index];
+		if (entry.type !== "custom" || entry.customType !== REQUEST_STATE_ENTRY_TYPE) continue;
+		if (!entry.data || typeof entry.data !== "object") continue;
+
+		const data = entry.data as Partial<CcRequestState>;
+		const promptId = data.promptId === null || (typeof data.promptId === "string" && PROMPT_ID_PATTERN.test(data.promptId))
+			? data.promptId
+			: undefined;
+		const requestId = data.requestId === null || (typeof data.requestId === "string" && REQUEST_ID_PATTERN.test(data.requestId))
+			? data.requestId
+			: undefined;
+		if (promptId === undefined || requestId === undefined) continue;
+
+		requestState = { promptId, requestId };
+		break;
+	}
+	return getRequestState();
+}
+
 interface SystemPromptEntry {
 	timestamp: string;
 	model: string;
 	systemPrompt: string;
+}
+
+interface ProviderResponseHeadersEntry {
+	timestamp: string;
+	status: number;
+	headers: Record<string, string>;
 }
 
 function getSessionDataDir(sessionFile: string): string {
@@ -144,6 +227,34 @@ export async function readSystemPrompts(sessionFile: string): Promise<SystemProm
 	}
 }
 
+export async function logProviderResponseHeaders(
+	sessionFile: string,
+	status: number,
+	headers: Record<string, string>,
+): Promise<void> {
+	const sessionDataDir = getSessionDataDir(sessionFile);
+	const logFile = join(sessionDataDir, PROVIDER_RESPONSE_HEADERS_LOG);
+	let lines: string[] = [];
+
+	try {
+		const content = await readFile(logFile, "utf8");
+		lines = content.trim().split("\n").filter(Boolean);
+	} catch {
+		// File doesn't exist yet.
+	}
+
+	const entry: ProviderResponseHeadersEntry = {
+		timestamp: new Date().toISOString(),
+		status,
+		headers,
+	};
+	lines.push(JSON.stringify(entry));
+	if (lines.length > MAX_LOG_ENTRIES) lines = lines.slice(-MAX_LOG_ENTRIES);
+
+	await mkdir(sessionDataDir, { recursive: true });
+	await writeFile(logFile, lines.join("\n") + "\n");
+}
+
 export function formatTimestamp(iso: string): string {
 	const date = new Date(iso);
 	return date.toLocaleString();
@@ -177,9 +288,18 @@ export function systemPromptToString(system: any): string | null {
 	return null;
 }
 
+export function isFirstPartyAnthropicTarget(model: ModelTarget | undefined): boolean {
+	if (model?.provider?.toLowerCase() !== "anthropic" || !model.baseUrl) return false;
+	try {
+		return new URL(model.baseUrl).host === "api.anthropic.com";
+	} catch {
+		return false;
+	}
+}
+
 export function isAnthropicTarget(
 	payload: Record<string, any>,
-	model: { provider?: string; id?: string } | undefined,
+	model: ModelTarget | undefined,
 ): boolean {
 	const provider = typeof model?.provider === "string" ? model.provider.toLowerCase() : "";
 	const modelId = typeof model?.id === "string" ? model.id.toLowerCase() : "";
@@ -286,28 +406,32 @@ export function ensureMetadata(payload: Record<string, any>): void {
 
 export async function patchProviderPayload(
 	payload: Record<string, any>,
-	model: { provider?: string; id?: string } | undefined,
+	model: ModelTarget | undefined,
 ): Promise<Record<string, any> | undefined> {
 	if (!payload || typeof payload !== "object") return undefined;
 	if (!Array.isArray(payload.messages)) return undefined;
 	if (!isAnthropicTarget(payload, model)) return undefined;
 
-	const billingHeader = buildBillingHeader(payload.messages);
+	const state = isFirstPartyAnthropicTarget(model) ? getRequestState() : null;
+	const billingHeader = buildBillingHeader(payload.messages, state);
 	await patchSystemPayload(payload, billingHeader);
 	ensureMetadata(payload);
 	return payload;
 }
 
 export default function (pi: ExtensionAPI) {
-	pi.on("before_agent_start", async (event) => {
+	pi.on("before_agent_start", async (event, ctx) => {
 		await prepareVirtualPackageDir(event.systemPrompt);
+		if (!isFirstPartyAnthropicTarget(ctx.model)) return;
+
+		pi.appendEntry(REQUEST_STATE_ENTRY_TYPE, startPrompt());
 	});
 
 	pi.on("before_provider_request", async (event, ctx) => {
 		const payload = event.payload as Record<string, any>;
 		const patchedPayload = await patchProviderPayload(
 			payload,
-			ctx.model as { provider?: string; id?: string } | undefined,
+			ctx.model as ModelTarget | undefined,
 		);
 		if (!patchedPayload) return;
 
@@ -324,10 +448,29 @@ export default function (pi: ExtensionAPI) {
 		return patchedPayload;
 	});
 
+	pi.on("after_provider_response", async (event, ctx) => {
+		if (!isFirstPartyAnthropicTarget(ctx.model)) return;
+
+		const state = captureRequestId(event.headers);
+		pi.appendEntry(REQUEST_STATE_ENTRY_TYPE, state);
+
+		const sessionFile = ctx.sessionManager.getSessionFile();
+		if (!sessionFile) return;
+		try {
+			await logProviderResponseHeaders(sessionFile, event.status, event.headers);
+		} catch {
+			// Ignore diagnostic logging errors.
+		}
+	});
+
 	pi.on("session_start", async (_e, ctx) => {
-		// Reset the version suffix cache for new session
 		resetVersionSuffixCache();
+		restoreRequestState(ctx.sessionManager.getBranch());
 		ctx.ui.notify("cc-patch: loaded (anthropic-only)", "info");
+	});
+
+	pi.on("session_tree", async (_e, ctx) => {
+		restoreRequestState(ctx.sessionManager.getBranch());
 	});
 
 	// Command to view logged system prompts

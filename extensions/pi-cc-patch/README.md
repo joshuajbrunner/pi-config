@@ -17,7 +17,7 @@ No token swap, no SDK dependency, no proxy. Just a `before_provider_request` hoo
 The billing header uses Claude Code's exact algorithm for the version suffix:
 
 ```
-x-anthropic-billing-header: cc_version=2.1.220.{suffix}; cc_entrypoint=cli; cch=00000;
+x-anthropic-billing-header: cc_version=2.1.260.{suffix}; cc_entrypoint=cli; cch=00000; [cc_prev_req=…;] [cc_prompt_id=…;]
 ```
 
 Where `{suffix}` is computed as:
@@ -27,16 +27,35 @@ suffix = sha256(SALT + chars[4,7,20] + VERSION).slice(0, 3)
 
 - **SALT**: `59cf53e54c78` (extracted from Claude Code binary)
 - **chars[4,7,20]**: Characters at positions 4, 7, 20 of the first user message (or "0" if missing)
-- **VERSION**: Current Claude Code version (e.g., `2.1.220`)
+- **VERSION**: Audited Claude Code version (`2.1.260`)
 - **ENTRYPOINT**: Normal Claude Code CLI sessions use `cli`
 
-Claude Code 2.1.220 also supports optional billing-header fields that this extension does not currently emit for the normal main CLI path:
+Claude Code 2.1.260 also supports optional billing-header fields that this extension does not emit for the normal main CLI path:
 
 - `cc_workload={value};` when a workload tag is set
 - `cc_is_subagent=true;` for non-main subagent sessions
 - `cch=00000;` is omitted for some non-first-party providers such as Bedrock/AWS/Mantle
 
-This makes the billing header match normal main-session Claude Code CLI requests.
+## Observed Claude Code 2.1.260 changes
+
+Static inspection of Claude Code 2.1.260 found two additional conditional fields in its billing-header builder:
+
+- `cc_prev_req=req_...;` identifies the preceding Anthropic API request. Claude Code obtains this server-assigned value from earlier assistant request history.
+- `cc_prompt_id={uuid};` identifies the current human prompt. Claude Code generates it locally with `randomUUID()` and reuses it for model requests associated with that prompt.
+
+The extension now emits these fields for first-party Anthropic requests when valid values are available. A new human prompt receives a new `cc_prompt_id`; tool continuations reuse it. `cc_prev_req` advances from the preceding successful Anthropic response's `request-id` and is absent on the first request when no predecessor exists. Requests routed through proxies or other providers do not receive these request-attribution fields.
+
+See [Billing Header Request-State Strategy](BILLING_HEADER_STATE_STRATEGY.md) for the observed validation rules, pi session-tree behavior, lifecycle validation, and references for future CCH investigation. The extension intentionally continues to send the existing literal `cch=00000` value.
+
+## Response Header Diagnostics
+
+For first-party Anthropic models using `api.anthropic.com`, the extension records the response status and normalized response headers exposed by pi's `after_provider_response` event. The latest 50 entries are written beside the session data:
+
+```text
+{session-data-directory}/provider-response-headers.jsonl
+```
+
+For a session file named `example.jsonl`, the log is stored in the sibling `example/provider-response-headers.jsonl` path. A first-party Anthropic/OAuth request on 2026-09-04 confirmed that pi exposes a lowercase `request-id` header containing a `req_...` value. The extension validates and retains that value as session-tree state and emits it as `cc_prev_req` on the next eligible request.
 
 ## Important: Disable Extra Usage
 
