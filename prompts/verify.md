@@ -28,10 +28,9 @@ Follow this process:
    - Linting/format validation
    - Any project-specific verification commands
 
-4. If this is a web app and live behavior can be verified, verify it against the running app using the browser-use skill.
+4. If this is a web app and live behavior can be verified, verify it against the running app using `agent-browser` when installed.
    - Start required dev server(s) if needed.
-   - If currently operating in cmux, use the cmux skill to inspect the current layout and run dev server(s) in cmux rather than blocking the main agent flow.
-   - Prefer browser-use for browser automation.
+   - Before using `agent-browser`, load its current workflow with `agent-browser skills get core`.
    - Verify the user's custom instructions when provided, for example: navigation, rendering, forms, login flows, and expected UI state.
 
 5. If this exposes or depends on a live API, verify against the live/local API when applicable.
@@ -44,7 +43,7 @@ Follow this process:
 
 7. Shut down any dev servers or temporary processes started during verification.
    - Do not shut down servers that were already running before verification began unless the user explicitly asks.
-   - If servers were started in cmux, stop those cmux processes/panes cleanly when possible.
+   - Stop any temporary processes started during verification cleanly when possible.
 
 8. Provide a final verification summary.
    - List each verification performed and its result.
