@@ -20,7 +20,9 @@ synthesis, and cleanup.
 3. Load the `pi-intercom` skill before coordinating sessions. Ignore any
    `pi-subagents` guidance in that skill: never use `pi-subagents`, and never
    allow a spawned session to delegate further.
-4. Announce what you are launching and why before creating it.
+4. Read [the model selection reference](models.md). Resolve every explicit model
+   request there before applying the invoked role skill's defaults.
+5. Announce what you are launching and why before creating it.
 
 ## Workspace layout
 
@@ -73,8 +75,8 @@ ID. The only permitted final layouts are `1x1`, `1x2`, and `2x2`.
 
 ## Start sessions
 
-Start pi in each selected pane with the model and thinking level specified by
-the invoked role skill:
+Start pi in each selected pane with the model and thinking level resolved from
+the user's request and the invoked role skill's defaults:
 
 ```bash
 herdr agent start <name> --kind pi --pane <pane-id> -- \
