@@ -41,7 +41,9 @@ printf '%s/%s\n' "$PI_PROVIDER" "$PI_MODEL"
 ## Launch
 
 Confirm Herdr first: `test "${HERDR_ENV:-}" = 1`. Run `herdr --skill` if you
-have not already this session.
+have not already this session. Load the `pi-intercom` skill before coordinating,
+and instruct every delegated session to load it. The global prohibition on
+`pi-subagents` overrides any `pi-subagents` guidance in that skill.
 
 1. Create a dedicated workspace without changing the user's focus. Never split,
    move, resize, or otherwise modify the calling agent's workspace:
@@ -105,12 +107,25 @@ have not already this session.
    - key files or commands
    - expected output shape
    - who to report to (your session name) and that it must not delegate further
+   - an instruction to load the `pi-intercom` skill
+   - an instruction to report blockers, material progress, and completion over
+     `pi-intercom` without waiting to be polled
+   - whether to answer an active `ask` with `reply` or report an asynchronously
+     assigned task with `send`
 
 ## Research and implementation
 
 - Brief each session independently; do not rely on them discovering each other.
-- Use `ask` when you need the result to continue; use `send` plus a later
-  `ask` for long tasks that might exceed the ask timeout.
+- Use `ask` when the result is required synchronously and the work is expected
+  to finish within the ask timeout. The delegated session must answer with
+  `reply`.
+- For longer work, use `send`. The delegated session must report progress,
+  blockers, and completion to the controlling session with `send`.
+- After using `send`, continue independent work or end the current turn and rely
+  on the inbound `pi-intercom` report. Never use `sleep`, timer loops, or
+  repeated `list`, `status`, Herdr, agent, or pane checks merely to determine
+  whether the delegated session has finished. Use `list` for target discovery
+  and `status` for troubleshooting, not as completion polling.
 - Implementation sessions should report the files changed and how they verified
   the change. Review their diff yourself before presenting it to the user.
 
