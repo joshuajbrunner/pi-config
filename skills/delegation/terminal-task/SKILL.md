@@ -1,10 +1,10 @@
 ---
-name: run-long-task
+name: terminal-task
 description: Explicitly start and manage a server or other long-running terminal command in Herdr without launching another pi session.
 disable-model-invocation: true
 ---
 
-# Run Long Task
+# Terminal Task
 
 Start the command given in the user's arguments in a dedicated Herdr workspace.
 Treat explicit instructions about the command, working directory, readiness
