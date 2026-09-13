@@ -43,16 +43,52 @@ printf '%s/%s\n' "$PI_PROVIDER" "$PI_MODEL"
 Confirm Herdr first: `test "${HERDR_ENV:-}" = 1`. Run `herdr --skill` if you
 have not already this session.
 
-1. Create a sibling pane (or a tab/workspace for long-lived work):
+1. Create a dedicated workspace without changing the user's focus. Never split,
+   move, resize, or otherwise modify the calling agent's workspace:
 
    ```bash
-   herdr pane split --current --direction right --cwd "$PWD" --no-focus
+   herdr workspace create \
+     --cwd "$PWD" \
+     --label <descriptive-workspace-name> \
+     --no-focus
    ```
 
-   Read the pane ID from `.result.pane.pane_id`.
+   Read the workspace ID and first tab's root pane ID from `.result.workspace`
+   and `.result.root_pane`. Parse the returned IDs; do not infer them.
 
-2. Start pi in it with the model, thinking level, and a descriptive name.
-   The name doubles as the `pi-intercom` target:
+2. Arrange the first tab as either `1x2` or `2x2`. Prefer `1x2`. Create an
+   equal side-by-side split and read the right pane ID from
+   `.result.pane.pane_id`:
+
+   ```bash
+   herdr pane split \
+     --pane <root-pane-id> \
+     --direction right \
+     --ratio 0.5 \
+     --cwd "$PWD" \
+     --no-focus
+   ```
+
+   Use `2x2` only when four closely related sessions or processes benefit from
+   remaining visible together. After the right split, split the root and right
+   panes downward with `--ratio 0.5`, reading each new pane ID from the command
+   response. Never create `2x1`, `1x4`, `4x4`, or larger pane layouts.
+
+3. When more working space is needed, prefer additional tabs in the dedicated
+   workspace over further pane splits:
+
+   ```bash
+   herdr tab create \
+     --workspace <workspace-id> \
+     --cwd "$PWD" \
+     --label <descriptive-tab-name> \
+     --no-focus
+   ```
+
+   Read the new tab's root pane ID from `.result.root_pane`.
+
+4. Start pi in the selected pane with the model, thinking level, and a
+   descriptive name. The name doubles as the `pi-intercom` target:
 
    ```bash
    herdr agent start <name> --kind pi --pane <pane-id> -- \
@@ -62,7 +98,7 @@ have not already this session.
    Name pattern: `<role>-<topic>`, e.g. `research-auth-flow`, `impl-retry-client`,
    `review-fable`, `review-astra`, `discuss-astra`.
 
-3. Confirm the session is live with `intercom({ action: "list" })`, then send
+5. Confirm the session is live with `intercom({ action: "list" })`, then send
    the brief with `send`. A good brief includes:
    - the goal and the definition of done
    - constraints and things not to touch
@@ -115,7 +151,7 @@ a design, plan, or decision.
 
 ## Cleanup
 
-- Once results are captured, close the panes and sessions you created unless
-  the user wants them kept for follow-up.
-- Never close panes, tabs, or workspaces you did not create.
+- Once results are captured, close the dedicated workspace and sessions you
+  created unless the user wants them kept for follow-up.
+- Never close or rearrange panes, tabs, or workspaces you did not create.
 - Summarize outcomes to the user; do not paste raw transcripts.
