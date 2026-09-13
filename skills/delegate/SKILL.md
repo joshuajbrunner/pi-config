@@ -58,10 +58,15 @@ and instruct every delegated session to load it. The global prohibition on
    Read the workspace ID and first tab's root pane ID from `.result.workspace`
    and `.result.root_pane`. Parse the returned IDs; do not infer them.
 
-2. Use the root pane for the first session. Split the first tab only when
-   multiple closely related sessions or processes benefit from remaining
-   visible together. Prefer `1x2`; create its equal side-by-side split and read
-   the right pane ID from `.result.pane.pane_id`:
+2. Use the root pane for the first session. A single-pane tab (`1x1`) is an
+   acceptable final layout; never split merely to fill space. Do not add panes
+   to a tab that was already split before the current task. Create a new tab
+   instead.
+
+   Split a fresh task tab only when multiple closely related sessions or
+   processes benefit from remaining visible together. Prefer `1x2`; create its
+   equal side-by-side split and read the right pane ID from
+   `.result.pane.pane_id`:
 
    ```bash
    herdr pane split \
@@ -72,10 +77,11 @@ and instruct every delegated session to load it. The global prohibition on
      --no-focus
    ```
 
-   Use `2x2` only for four closely related sessions or processes. After the
-   right split, split the root and right panes downward with `--ratio 0.5`,
-   reading each new pane ID from the command response. Never create `2x1`,
-   `1x4`, `4x4`, or larger pane layouts.
+   Use `2x2` only when intentionally laying out a fresh tab for four closely
+   related sessions or processes. After the right split, split the root and
+   right panes downward with `--ratio 0.5`, reading each new pane ID from the
+   command response. The only permitted final layouts are `1x1`, `1x2`, and
+   `2x2`.
 
 3. When more working space is needed, prefer additional tabs in the dedicated
    workspace over further pane splits:
