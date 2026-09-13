@@ -30,6 +30,7 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 | `implement` | Explicitly launch and supervise implementation sessions |
 | `research` | Explicitly launch sessions for focused research |
 | `review` | Explicitly launch one or more review sessions |
+| `run-long-task` | Explicitly run a server or long-running command in Herdr |
 | `implement-task` | Implement tasks from a plan's TASKS.md file |
 | `plan-to-tasks` | Decompose plans into actionable tasks |
 | `write-plan` | Interview and document features as structured plans |
@@ -55,8 +56,8 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 
 Skills are available when the package is installed. Reference them with
 `/skill:<name>` or let pi load them based on task context. The `implement`,
-`research`, `review`, and `discuss` delegation skills are manual-only and must be
-invoked explicitly with `/skill:<name>`.
+`research`, `review`, `discuss`, and `run-long-task` orchestration skills are
+manual-only and must be invoked explicitly with `/skill:<name>`.
 
 ## Installed third-party packages
 
