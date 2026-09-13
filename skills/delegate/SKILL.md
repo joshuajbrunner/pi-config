@@ -112,6 +112,9 @@ and instruct every delegated session to load it. The global prohibition on
      `pi-intercom` without waiting to be polled
    - whether to answer an active `ask` with `reply` or report an asynchronously
      assigned task with `send`
+   - where intentional task outputs belong, and an instruction to place all
+     temporary coordination artifacts outside the project in a unique directory
+     created with `mktemp -d`
 
 ## Research and implementation
 
@@ -163,6 +166,23 @@ a design, plan, or decision.
 2. Ask them to exchange positions directly over `pi-intercom` and to return a
    joint summary of agreements and disagreements.
 3. Synthesize for the user, adding your own view.
+
+## Temporary artifacts
+
+Prefer direct `pi-intercom` messages or attachments for small results. Do not
+place scratch files, transcripts, logs, screenshots, exported results, or
+oversized inter-session handoffs in the project working directory. Create a
+unique temporary directory instead:
+
+```bash
+artifact_dir="$(mktemp -d "${TMPDIR:-/tmp}/pi-delegate.XXXXXX")"
+```
+
+Use project paths only for files that are intentional task outputs or repository
+changes. When handing off a temporary artifact, send its absolute path over
+`pi-intercom`. The session that created the temporary directory is responsible
+for removing it after the controlling session confirms the contents are no
+longer needed.
 
 ## Cleanup
 
