@@ -26,6 +26,10 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 | `create-extension` | Create pi extensions for projects |
 | `create-skill` | Create reusable pi skills |
 | `github-issue` | Create GitHub issues using gh CLI |
+| `discuss` | Explicitly conduct a discussion with one or more peer models |
+| `implement` | Explicitly launch and supervise implementation sessions |
+| `research` | Explicitly launch sessions for focused research |
+| `review` | Explicitly launch one or more review sessions |
 | `implement-task` | Implement tasks from a plan's TASKS.md file |
 | `plan-to-tasks` | Decompose plans into actionable tasks |
 | `write-plan` | Interview and document features as structured plans |
@@ -49,7 +53,10 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 
 ## Usage
 
-Skills are automatically available when the package is installed. Reference them with `/skill:<name>` or let pi load them based on task context.
+Skills are available when the package is installed. Reference them with
+`/skill:<name>` or let pi load them based on task context. The `implement`,
+`research`, `review`, and `discuss` delegation skills are manual-only and must be
+invoked explicitly with `/skill:<name>`.
 
 ## Installed third-party packages
 
