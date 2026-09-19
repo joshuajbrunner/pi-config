@@ -43,6 +43,7 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 | `pi-cc-patch` | Patches requests for Claude Pro/Max subscription compatibility |
 | `policy-self-heal` | Detects provider policy false-positive errors and queues a safe recovery prompt |
 | `session-tools` | Save session summaries and browse/resume sessions with summary previews |
+| `jev-audit` | Audit final agent responses with TypeSafe Jev and browse session-local audit records |
 
 ### Commands
 
@@ -52,6 +53,7 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 | `/policy-self-heal` | Manage policy error self-healing and inspect the last detected event |
 | `/summarize [instruction]` | Summarize the current session and save it beside the session JSONL |
 | `/session-browser [all]` | Browse sessions with latest saved summary previews and resume the selected session |
+| `/jev-audit [on|off|view|status]` | Toggle response auditing or view the current session's Jev audit records |
 
 ## Usage
 
