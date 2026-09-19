@@ -5,6 +5,7 @@ export interface JevAuditResult {
 	tooVerbose: number;
 	tooJargony: number;
 	tooMixed: number;
+	tooUnclear: number;
 	needsRewrite: boolean;
 }
 
@@ -43,6 +44,11 @@ export async function auditWithJev(
 					instructions:
 						"This response mixes too many distinct concerns or complex decisions, forcing the reader to switch context before completing one coherent objective. Count necessary supporting details as part of the objective; flag only unrelated or independently difficult concerns.",
 				},
+				too_unclear: {
+					type: "noul",
+					instructions:
+						"This response contains grammatical errors, malformed sentences, awkward or incomplete phrasing, ambiguous references, or accidental word substitutions that make its meaning difficult to understand. Do not flag concise technical language merely because it is technical; flag prose that forces the reader to reconstruct what the author meant.",
+				},
 			},
 		}),
 		signal,
@@ -57,12 +63,18 @@ export async function auditWithJev(
 	const tooVerbose = readNoul(answers.too_verbose, "too_verbose");
 	const tooJargony = readNoul(answers.too_jargony, "too_jargony");
 	const tooMixed = readNoul(answers.too_mixed, "too_mixed");
+	const tooUnclear = readNoul(answers.too_unclear, "too_unclear");
 
 	return {
 		tooVerbose,
 		tooJargony,
 		tooMixed,
-		needsRewrite: tooVerbose >= 0.7 || tooJargony >= 0.7 || tooMixed >= 0.7,
+		tooUnclear,
+		needsRewrite:
+			tooVerbose >= 0.7 ||
+			tooJargony >= 0.7 ||
+			tooMixed >= 0.7 ||
+			tooUnclear >= 0.6,
 	};
 }
 

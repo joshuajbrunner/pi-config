@@ -10,6 +10,7 @@ export interface JevAuditRecord {
 	tooVerbose: number;
 	tooJargony: number;
 	tooMixed: number;
+	tooUnclear: number;
 	needsRewrite: boolean;
 }
 
@@ -30,6 +31,7 @@ export async function loadAuditRecords(filePath: string): Promise<JevAuditRecord
 		return parsed.filter(isAuditRecord).map((record) => ({
 			...record,
 			tooMixed: record.tooMixed ?? 0,
+			tooUnclear: record.tooUnclear ?? 0,
 		}));
 	} catch {
 		return [];
@@ -57,6 +59,7 @@ function isAuditRecord(value: unknown): value is JevAuditRecord {
 		typeof record.tooVerbose === "number" &&
 		typeof record.tooJargony === "number" &&
 		(record.tooMixed === undefined || typeof record.tooMixed === "number") &&
+		(record.tooUnclear === undefined || typeof record.tooUnclear === "number") &&
 		typeof record.needsRewrite === "boolean"
 	);
 }
