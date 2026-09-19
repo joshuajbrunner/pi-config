@@ -110,7 +110,14 @@ export default function jevAudit(pi: ExtensionAPI): void {
 
 function queueRewrite(pi: ExtensionAPI): void {
 	pi.sendUserMessage(
-		"Rewrite your immediately preceding response for a human reader. Preserve all factual content and important caveats. Repair grammatical errors, malformed sentences, accidental word substitutions, and ambiguous phrasing. Define unavoidable technical terms, remove unnecessary jargon, and be concise. Keep the primary objective first, separate necessary secondary concerns under clear headings, recommend one path before alternatives, and defer optional decisions. Return only the rewritten response.",
+		[
+			"Rewrite your immediately preceding response for a human reader.",
+			"Return a replacement response, not commentary about the rewrite. Do not mention the earlier response, corrections, mistakes, or what you changed.",
+			"Preserve conclusions, decisions, evidence, and important caveats—not every sentence or detail. Remove duplicated explanations and unsupported shorthand. State the result first, summarize verification briefly, and make any required decision explicit. Retain long quoted artifacts only when the user needs to approve or use them.",
+			"Repair grammatical errors, malformed sentences, accidental word substitutions, and ambiguous phrasing. Define unavoidable technical terms and remove unnecessary jargon.",
+			"Be no longer than the original unless additional wording is required to correct a factual error.",
+			"Return only the rewritten response.",
+		].join("\n\n"),
 		{ deliverAs: "followUp" },
 	);
 }

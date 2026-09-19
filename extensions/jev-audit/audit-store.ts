@@ -11,6 +11,7 @@ export interface JevAuditRecord {
 	tooJargony: number;
 	tooMixed: number;
 	tooUnclear: number;
+	tooMeta: number;
 	needsRewrite: boolean;
 }
 
@@ -32,6 +33,7 @@ export async function loadAuditRecords(filePath: string): Promise<JevAuditRecord
 			...record,
 			tooMixed: record.tooMixed ?? 0,
 			tooUnclear: record.tooUnclear ?? 0,
+			tooMeta: record.tooMeta ?? 0,
 		}));
 	} catch {
 		return [];
@@ -60,6 +62,7 @@ function isAuditRecord(value: unknown): value is JevAuditRecord {
 		typeof record.tooJargony === "number" &&
 		(record.tooMixed === undefined || typeof record.tooMixed === "number") &&
 		(record.tooUnclear === undefined || typeof record.tooUnclear === "number") &&
+		(record.tooMeta === undefined || typeof record.tooMeta === "number") &&
 		typeof record.needsRewrite === "boolean"
 	);
 }

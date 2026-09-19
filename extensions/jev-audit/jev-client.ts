@@ -6,6 +6,7 @@ export interface JevAuditResult {
 	tooJargony: number;
 	tooMixed: number;
 	tooUnclear: number;
+	tooMeta: number;
 	needsRewrite: boolean;
 }
 
@@ -32,12 +33,12 @@ export async function auditWithJev(
 				too_verbose: {
 					type: "noul",
 					instructions:
-						"This response is unnecessarily verbose for its reader and could be substantially shorter without losing important meaning.",
+						"This response uses more words than its reader needs. Flag duplicated explanations, commentary about drafting or rewriting, defensive justification, and implementation detail disproportionate to the user's question. Judge necessary evidence, requested artifacts, and important caveats as useful, not verbose.",
 				},
 				too_jargony: {
 					type: "noul",
 					instructions:
-						"This response uses excessive unexplained jargon or specialist language that makes it difficult for its reader to understand.",
+						"This response uses unexplained jargon, acronyms, shorthand, labels, metaphors, or specialist language that makes the reader infer its meaning. Do not flag precise technical terms that the reader likely knows or that the response defines in context.",
 				},
 				too_mixed: {
 					type: "noul",
@@ -47,7 +48,12 @@ export async function auditWithJev(
 				too_unclear: {
 					type: "noul",
 					instructions:
-						"This response contains grammatical errors, malformed sentences, awkward or incomplete phrasing, ambiguous references, or accidental word substitutions that make its meaning difficult to understand. Do not flag concise technical language merely because it is technical; flag prose that forces the reader to reconstruct what the author meant.",
+						"This response contains grammatical errors, malformed or incomplete sentences, ambiguous references, accidental word substitutions, or broken logical connections that force the reader to reconstruct the intended meaning. Do not flag prose merely because it is concise or technical.",
+				},
+				too_meta: {
+					type: "noul",
+					instructions:
+						"This response discusses its own wording, drafting, rewriting, corrections, or response process instead of directly serving the reader. Do not flag process information the user explicitly requested or that materially affects the result.",
 				},
 			},
 		}),
@@ -64,17 +70,20 @@ export async function auditWithJev(
 	const tooJargony = readNoul(answers.too_jargony, "too_jargony");
 	const tooMixed = readNoul(answers.too_mixed, "too_mixed");
 	const tooUnclear = readNoul(answers.too_unclear, "too_unclear");
+	const tooMeta = readNoul(answers.too_meta, "too_meta");
 
 	return {
 		tooVerbose,
 		tooJargony,
 		tooMixed,
 		tooUnclear,
+		tooMeta,
 		needsRewrite:
 			tooVerbose >= 0.7 ||
 			tooJargony >= 0.7 ||
 			tooMixed >= 0.7 ||
-			tooUnclear >= 0.6,
+			tooUnclear >= 0.6 ||
+			tooMeta >= 0.6,
 	};
 }
 

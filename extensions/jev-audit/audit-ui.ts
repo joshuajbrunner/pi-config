@@ -32,6 +32,7 @@ export async function showAuditUi(
 				`- **Too jargony:** ${record.tooJargony.toFixed(3)}`,
 				`- **Too mixed:** ${record.tooMixed.toFixed(3)}`,
 				`- **Too unclear:** ${record.tooUnclear.toFixed(3)}`,
+				`- **Too meta:** ${record.tooMeta.toFixed(3)}`,
 				`- **Model:** ${record.model}`,
 				"",
 				"---",
