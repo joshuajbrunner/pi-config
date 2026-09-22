@@ -31,8 +31,9 @@ export const VIRTUAL_PACKAGE_DIR = "/tmp/coding-agent";
 
 // Billing header constants (extracted from Claude Code binary)
 const BILLING_SALT = "59cf53e54c78";
-const CC_VERSION = "2.1.260";
+const CC_VERSION = "2.1.280";
 const CC_ENTRYPOINT = "cli";
+const CC_TURN_ORIGIN = "human";
 
 // Session-level cache for the version suffix (reset on session_start)
 let cachedVersionSuffix: string | null = null;
@@ -105,6 +106,9 @@ export function buildBillingHeader(
 	}
 	if (state?.promptId && PROMPT_ID_PATTERN.test(state.promptId)) {
 		header += ` cc_prompt_id=${state.promptId};`;
+	}
+	if (state !== null) {
+		header += ` cc_turn_origin=${CC_TURN_ORIGIN};`;
 	}
 	return header;
 }

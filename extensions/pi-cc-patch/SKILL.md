@@ -21,14 +21,14 @@ Verify the installed Claude Code CLI's billing header construction against the e
 2. Search the current and previous binaries for billing-header markers.
 
    ```bash
-   rg -a -n "cc_version|cc_entrypoint|x-anthropic-billing-header|59cf53e54c78|cc_workload|cc_is_subagent" \
+   rg -a -n "cc_version|cc_entrypoint|x-anthropic-billing-header|59cf53e54c78|cc_workload|cc_is_subagent|cc_prev_req|cc_prompt_id|cc_turn_origin" \
      ~/.local/share/claude/versions/<version>
    ```
 
    If output is too large, use byte offsets:
 
    ```bash
-   grep -aob 'x-anthropic-billing-header\|cc_version\|cc_entrypoint\|59cf53e54c78\|cc_workload\|cc_is_subagent' \
+   grep -aob 'x-anthropic-billing-header\|cc_version\|cc_entrypoint\|59cf53e54c78\|cc_workload\|cc_is_subagent\|cc_prev_req\|cc_prompt_id\|cc_turn_origin' \
      ~/.local/share/claude/versions/<version>
    ```
 
@@ -58,6 +58,8 @@ Verify the installed Claude Code CLI's billing header construction against the e
    - `cch=00000;`: currently present for first-party Anthropic/OAuth, omitted for some providers such as Bedrock/AWS/Mantle.
    - Optional `cc_workload=...;` may appear when a workload is set.
    - Optional `cc_is_subagent=true;` may appear for non-main subagent sessions.
+   - First-party requests may include validated request-attribution fields in this order: `cc_prev_req`, `cc_prompt_id`, then `cc_turn_origin`.
+   - Normal interactive human turns use `cc_turn_origin=human;`; verify the accepted origin pattern and any new categories.
 
 5. Compute expected suffixes for test fixtures.
 
@@ -93,6 +95,6 @@ Summarize:
 
 - Claude Code version inspected.
 - Binary path inspected.
-- Whether salt/sample positions/hash slice/header shape changed.
+- Whether salt/sample positions/hash slice/header shape or request-attribution fields changed.
 - Current expected header for `"What day is it?"`.
 - Files updated.

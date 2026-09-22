@@ -2,11 +2,11 @@
 
 ## Status
 
-This document records behavior observed in the Claude Code 2.1.260 executable and the request-state implementation in `pi-cc-patch`. The extension generates, validates, persists, restores, and conditionally emits the values described here for first-party Anthropic requests.
+This document records behavior observed in the Claude Code 2.1.280 executable and the request-state implementation in `pi-cc-patch`. The extension generates, validates, persists, restores, and conditionally emits the values described here for first-party Anthropic requests.
 
 The extension also logs Anthropic response headers so the actual header names and values exposed by pi can be verified.
 
-## Claude Code 2.1.260 behavior
+## Claude Code 2.1.280 behavior
 
 Claude Code still emits the existing billing-header fields:
 
@@ -19,6 +19,7 @@ Its billing-header builder can also emit these conditional fields:
 ```text
 cc_prev_req=req_...;
 cc_prompt_id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx;
+cc_turn_origin=human;
 ```
 
 For normal first-party Anthropic requests, the fields are constructed as follows.
@@ -47,9 +48,23 @@ The builder emits the field only when the value matches:
 
 A first request has no previous request ID, so this field is absent.
 
+### `cc_turn_origin`
+
+Claude Code 2.1.280 attaches a turn origin to the latest eligible user message and carries it across model requests for the same turn. A normal interactive prompt uses:
+
+```text
+cc_turn_origin=human;
+```
+
+Other observed origin categories include `auto_continuation`, `task_notification`, `scheduled`, `peer`, `host_synthetic`, `system`, `sdk`, and `unknown`. The billing-header builder emits the field only when it matches:
+
+```text
+^[a-z][a-z_]{0,31}$
+```
+
 ### Other conditions
 
-Both fields are restricted to the first-party Anthropic path using the normal Anthropic endpoint. The builder can omit them when their values are unavailable or invalid. This conditional construction does not establish whether Anthropic's billing classifier currently requires either field.
+All three request-attribution fields are restricted to the first-party Anthropic path using the normal Anthropic endpoint. The builder can omit them when their values are unavailable or invalid. This conditional construction does not establish whether Anthropic's billing classifier currently requires them.
 
 ## Other billing fields
 
@@ -61,7 +76,7 @@ The JavaScript builder inserts the fixed sentinel:
 cch=00000;
 ```
 
-Claude Code 2.1.260 includes it when the provider route is first-party with an unset or `api.anthropic.com` base URL, or when the provider route is Vertex. It omits the field for routes such as Bedrock, Foundry, Mantle, and the Claude Code gateway.
+Claude Code 2.1.280 includes it when the provider route is first-party with an unset or `api.anthropic.com` base URL, or when the provider route is Vertex. It omits the field for routes such as Bedrock, Foundry, Mantle, and the Claude Code gateway.
 
 The placeholder should not be assumed to be the final value on the network. Independent runtime analysis reports that Claude Code's custom Bun `fetch` implementation recognizes `/v1/messages` requests, hashes the serialized request body, and replaces the five zeroes with a request-dependent five-character hexadecimal value before transmission. The installed JavaScript confirms the sentinel construction and routing conditions, but this native replacement was not independently reproduced during this audit.
 
@@ -69,7 +84,7 @@ The placeholder should not be assumed to be the final value on the network. Inde
 
 #### Related CCH research and implementations
 
-These sources are unofficial. Most were published around the March 2026 Claude Code source leak and may describe versions older than 2.1.260.
+These sources are unofficial. Most were published around the March 2026 Claude Code source leak and may describe versions older than 2.1.280.
 
 - [What's cch? Reverse Engineering Claude Code's Request Signing](https://a10k.co/b/reverse-engineering-claude-code-cch.html) — runtime and wire-level reverse engineering of the sentinel replacement and body hash.
 - [Claude Code's Defense in Depth](https://yage.ai/share/claude-code-defense-in-depth-en-20260401.html) — source-level discussion of native client attestation.
@@ -111,7 +126,7 @@ This describes the request's execution context, not whether the conversation hap
 When every optional field is present, the binary constructs them in this order:
 
 ```text
-x-anthropic-billing-header: cc_version={version}.{suffix}; cc_entrypoint={entrypoint}; cch=00000; cc_workload={tag}; cc_is_subagent=true; cc_prev_req={requestId}; cc_prompt_id={promptId};
+x-anthropic-billing-header: cc_version={version}.{suffix}; cc_entrypoint={entrypoint}; cch=00000; cc_workload={tag}; cc_is_subagent=true; cc_prev_req={requestId}; cc_prompt_id={promptId}; cc_turn_origin={origin};
 ```
 
 ## Pi data currently available
@@ -145,7 +160,8 @@ The log retains the latest 50 responses. Logging does not alter outgoing request
 1. Generate a UUID when `before_agent_start` fires for a new Anthropic human prompt.
 2. Reuse it for all provider requests in that agent run.
 3. Persist it and emit it as `cc_prompt_id` on eligible first-party requests.
-4. Generate a new UUID for the next human prompt.
+4. Emit `cc_turn_origin=human` for the normal interactive pi turn and its continuations.
+5. Generate a new UUID for the next human prompt.
 
 Queued steering and follow-up prompts need explicit verification because they may begin a new agent run while sharing surrounding conversation history.
 
@@ -200,10 +216,10 @@ Live first-party Anthropic/OAuth requests through pi confirmed:
 The implementation now emits valid request state in Claude Code's observed order:
 
 ```text
-cch=00000; cc_prev_req={requestId}; cc_prompt_id={promptId};
+cch=00000; cc_prev_req={requestId}; cc_prompt_id={promptId}; cc_turn_origin=human;
 ```
 
-The first request omits `cc_prev_req`. Both fields are omitted unless the model provider is exactly `anthropic` and its base URL host is exactly `api.anthropic.com`.
+The first request omits `cc_prev_req`. All three request-attribution fields are omitted unless the model provider is exactly `anthropic` and its base URL host is exactly `api.anthropic.com`.
 
 A post-emission live test on 2026-09-04 confirmed:
 
@@ -211,6 +227,6 @@ A post-emission live test on 2026-09-04 confirmed:
 - the initial request emitted `cc_prompt_id` without `cc_prev_req`;
 - the tool continuation reused that prompt ID and emitted the first response's request ID as `cc_prev_req`;
 - reopening the saved session and submitting another human prompt generated a different prompt ID while emitting the tool continuation's response ID as `cc_prev_req`;
-- every request used `cc_version=2.1.260.{suffix}` and retained the literal `cch=00000` sentinel.
+- every request used the then-current `cc_version=2.1.260.{suffix}` and retained the literal `cch=00000` sentinel.
 
 Proxy exclusion remains covered by automated tests rather than a live custom-provider request.
