@@ -195,7 +195,7 @@ describe("buildBillingHeader", () => {
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.280.519; cc_entrypoint=cli; cch=00000; cc_turn_origin=human;"
+			"x-anthropic-billing-header: cc_version=2.1.284.8a1; cc_entrypoint=cli; cch=00000; cc_turn_origin=human;"
 		);
 	});
 
@@ -215,7 +215,7 @@ describe("buildBillingHeader", () => {
 		const messages = [{ role: "assistant", content: "Hello" }];
 		const header = buildBillingHeader(messages);
 
-		assert.match(header, /cc_version=2\.1\.280\.000/);
+		assert.match(header, /cc_version=2\.1\.284\.000/);
 	});
 
 	it("should include all required header components", () => {
@@ -223,7 +223,7 @@ describe("buildBillingHeader", () => {
 		const header = buildBillingHeader(messages);
 
 		assert.match(header, /x-anthropic-billing-header:/);
-		assert.match(header, /cc_version=2\.1\.280\.[0-9a-f]{3}/);
+		assert.match(header, /cc_version=2\.1\.284\.[0-9a-f]{3}/);
 		assert.match(header, /cc_entrypoint=cli/);
 		assert.match(header, /cch=00000/);
 		assert.match(header, /cc_turn_origin=human/);
@@ -243,8 +243,18 @@ describe("Claude Code request state", () => {
 		assert.deepStrictEqual(state, {
 			promptId: "550e8400-e29b-41d4-a716-446655440000",
 			requestId: "req_previous",
+			turnPosition: { promptIndex: 1, turnIndex: 1 },
 		});
 		assert.deepStrictEqual(getRequestState(), state);
+	});
+
+	it("increments prompt and turn indexes for each human prompt", () => {
+		startPrompt("550e8400-e29b-41d4-a716-446655440000");
+		const state = startPrompt("123e4567-e89b-12d3-a456-426614174000");
+
+		assert.deepStrictEqual(state.turnPosition, { promptIndex: 2, turnIndex: 2 });
+		const header = buildBillingHeader([{ role: "user", content: "Hello" }]);
+		assert.match(header, /cc_prompt_index=2; cc_turn_index=2;$/);
 	});
 
 	it("captures validated request IDs from normalized response headers", () => {
@@ -252,14 +262,17 @@ describe("Claude Code request state", () => {
 		assert.deepStrictEqual(captureRequestId({ "request-id": "req_primary" }), {
 			promptId: "550e8400-e29b-41d4-a716-446655440000",
 			requestId: "req_primary",
+			turnPosition: { promptIndex: 1, turnIndex: 1 },
 		});
 		assert.deepStrictEqual(captureRequestId({ "x-request-id": "req_not_used" }), {
 			promptId: "550e8400-e29b-41d4-a716-446655440000",
 			requestId: null,
+			turnPosition: { promptIndex: 1, turnIndex: 1 },
 		});
 		assert.deepStrictEqual(captureRequestId({ "request-id": "msg_not_a_request" }), {
 			promptId: "550e8400-e29b-41d4-a716-446655440000",
 			requestId: null,
+			turnPosition: { promptIndex: 1, turnIndex: 1 },
 		});
 	});
 
@@ -267,16 +280,47 @@ describe("Claude Code request state", () => {
 		const first = {
 			type: "custom",
 			customType: REQUEST_STATE_ENTRY_TYPE,
-			data: { promptId: "550e8400-e29b-41d4-a716-446655440000", requestId: "req_first" },
+			data: {
+				promptId: "550e8400-e29b-41d4-a716-446655440000",
+				requestId: "req_first",
+				turnPosition: { promptIndex: 1, turnIndex: 1 },
+			},
 		};
 		const latest = {
 			type: "custom",
 			customType: REQUEST_STATE_ENTRY_TYPE,
-			data: { promptId: "123e4567-e89b-12d3-a456-426614174000", requestId: "req_latest" },
+			data: {
+				promptId: "123e4567-e89b-12d3-a456-426614174000",
+				requestId: "req_latest",
+				turnPosition: { promptIndex: 2, turnIndex: 2 },
+			},
 		};
 
 		assert.deepStrictEqual(restoreRequestState([first, { type: "message" }, latest]), latest.data);
-		assert.deepStrictEqual(restoreRequestState([]), { promptId: null, requestId: null });
+		assert.deepStrictEqual(restoreRequestState([]), {
+			promptId: null,
+			requestId: null,
+			turnPosition: { promptIndex: 0, turnIndex: 0 },
+		});
+	});
+
+	it("omits turn indexes when restoring request state written by an older version", () => {
+		const legacy = {
+			type: "custom",
+			customType: REQUEST_STATE_ENTRY_TYPE,
+			data: {
+				promptId: "550e8400-e29b-41d4-a716-446655440000",
+				requestId: "req_legacy",
+			},
+		};
+
+		assert.deepStrictEqual(restoreRequestState([legacy]), {
+			...legacy.data,
+			turnPosition: null,
+		});
+		startPrompt("123e4567-e89b-12d3-a456-426614174000");
+		const header = buildBillingHeader([{ role: "user", content: "Hello" }]);
+		assert.doesNotMatch(header, /cc_prompt_index|cc_turn_index/);
 	});
 
 	it("emits validated request state in Claude Code field order", () => {
@@ -286,7 +330,7 @@ describe("Claude Code request state", () => {
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.280.790; cc_entrypoint=cli; cch=00000; cc_prev_req=req_previous; cc_prompt_id=550e8400-e29b-41d4-a716-446655440000; cc_turn_origin=human;",
+			"x-anthropic-billing-header: cc_version=2.1.284.b93; cc_entrypoint=cli; cch=00000; cc_prev_req=req_previous; cc_prompt_id=550e8400-e29b-41d4-a716-446655440000; cc_turn_origin=human; cc_prompt_index=1; cc_turn_index=1;",
 		);
 	});
 
@@ -304,7 +348,7 @@ describe("Claude Code request state", () => {
 		const disabled = buildBillingHeader([{ role: "user", content: "Hello" }], null);
 		const invalid = buildBillingHeader(
 			[{ role: "user", content: "Hello" }],
-			{ promptId: "not-a-uuid", requestId: "msg_not_a_request" },
+			{ promptId: "not-a-uuid", requestId: "msg_not_a_request", turnPosition: null },
 		);
 
 		assert.doesNotMatch(disabled, /cc_prompt_id|cc_prev_req|cc_turn_origin/);
@@ -335,15 +379,16 @@ describe("integration: verified against Claude Code", () => {
 	});
 
 	it("should match Claude Code billing header for 'What day is it?'", () => {
-		// Verified against the Claude Code CLI 2.1.280 billing-header algorithm.
+		// Verified against the Claude Code CLI 2.1.284 billing-header algorithm.
 		// First user message: "What day is it?"
 
 		const messages = [{ role: "user", content: "What day is it?" }];
+		startPrompt("550e8400-e29b-41d4-a716-446655440000");
 		const header = buildBillingHeader(messages);
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.280.519; cc_entrypoint=cli; cch=00000; cc_turn_origin=human;"
+			"x-anthropic-billing-header: cc_version=2.1.284.8a1; cc_entrypoint=cli; cch=00000; cc_prompt_id=550e8400-e29b-41d4-a716-446655440000; cc_turn_origin=human; cc_prompt_index=1; cc_turn_index=1;"
 		);
 	});
 
@@ -517,7 +562,7 @@ describe("provider payload patching", () => {
 
 		assert.strictEqual(result, payload);
 		assert.strictEqual(payload.system.length, 2);
-		assert.match(payload.system[0].text, /^x-anthropic-billing-header: cc_version=2\.1\.280\.519/);
+		assert.match(payload.system[0].text, /^x-anthropic-billing-header: cc_version=2\.1\.284\.8a1/);
 		assert.strictEqual(payload.system[1].text, "You are operating inside a minimal coding agent harness.");
 		assert.deepStrictEqual(JSON.parse(payload.metadata.user_id), { device_id: "0", account_uuid: "", session_id: "0" });
 	});
@@ -536,7 +581,7 @@ describe("provider payload patching", () => {
 			provider: "anthropic",
 			baseUrl: "https://api.anthropic.com",
 		});
-		assert.match(firstParty.system[0].text, /cc_prev_req=req_previous; cc_prompt_id=550e8400-e29b-41d4-a716-446655440000; cc_turn_origin=human;$/);
+		assert.match(firstParty.system[0].text, /cc_prev_req=req_previous; cc_prompt_id=550e8400-e29b-41d4-a716-446655440000; cc_turn_origin=human; cc_prompt_index=1; cc_turn_index=1;$/);
 
 		const proxy = makePayload();
 		await patchProviderPayload(proxy, {
@@ -840,7 +885,7 @@ describe("extension registration", () => {
 		};
 		await handlers.get("before_provider_request")!({ payload: first }, ctx);
 		assert.doesNotMatch(first.system[0].text, /cc_prev_req/);
-		assert.match(first.system[0].text, new RegExp(`cc_prompt_id=${promptId}; cc_turn_origin=human;$`));
+		assert.match(first.system[0].text, new RegExp(`cc_prompt_id=${promptId}; cc_turn_origin=human; cc_prompt_index=1; cc_turn_index=1;$`));
 
 		await handlers.get("after_provider_response")!(
 			{ status: 200, headers: { "request-id": "req_first" } },
@@ -853,7 +898,7 @@ describe("extension registration", () => {
 			system: "system",
 		};
 		await handlers.get("before_provider_request")!({ payload: continuation }, ctx);
-		assert.match(continuation.system[0].text, new RegExp(`cc_prev_req=req_first; cc_prompt_id=${promptId}; cc_turn_origin=human;$`));
+		assert.match(continuation.system[0].text, new RegExp(`cc_prev_req=req_first; cc_prompt_id=${promptId}; cc_turn_origin=human; cc_prompt_index=1; cc_turn_index=1;$`));
 	});
 
 	it("logs and persists validated Anthropic response request IDs", async () => {
@@ -872,7 +917,11 @@ describe("extension registration", () => {
 		assert.strictEqual(entries.length, 1);
 		assert.deepStrictEqual(entries[0], {
 			customType: REQUEST_STATE_ENTRY_TYPE,
-			data: { promptId: null, requestId: "req_observed" },
+			data: {
+				promptId: null,
+				requestId: "req_observed",
+				turnPosition: { promptIndex: 0, turnIndex: 0 },
+			},
 		});
 		assert.strictEqual(vi.mocked(writeFile).mock.calls.length, 1);
 		assert.match(String(vi.mocked(writeFile).mock.calls[0][0]), /provider-response-headers\.jsonl$/);
@@ -899,9 +948,9 @@ describe("extension registration", () => {
 		await handlers.get("session_start")!({}, { ui, sessionManager: { getBranch: () => branch } });
 
 		assert.deepStrictEqual(ui.notify.mock.calls[0], ["cc-patch: loaded (anthropic-only)", "info"]);
-		assert.deepStrictEqual(getRequestState(), branch[0].data);
+		assert.deepStrictEqual(getRequestState(), { ...branch[0].data, turnPosition: null });
 		const header = buildBillingHeader([{ role: "user", content: "Second message" }]);
-		assert.match(header, new RegExp(`cc_version=2\\.1\\.280\\.${computeVersionSuffix("Second message")}`));
+		assert.match(header, new RegExp(`cc_version=2\\.1\\.284\\.${computeVersionSuffix("Second message")}`));
 	});
 
 	it("restores request state after session tree navigation", async () => {
@@ -914,7 +963,7 @@ describe("extension registration", () => {
 
 		await handlers.get("session_tree")!({}, { sessionManager: { getBranch: () => branch } });
 
-		assert.deepStrictEqual(getRequestState(), branch[0].data);
+		assert.deepStrictEqual(getRequestState(), { ...branch[0].data, turnPosition: null });
 	});
 
 	it("debug command handles no session file and no entries", async () => {

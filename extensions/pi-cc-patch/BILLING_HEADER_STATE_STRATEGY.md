@@ -2,11 +2,11 @@
 
 ## Status
 
-This document records behavior observed in the Claude Code 2.1.280 executable and the request-state implementation in `pi-cc-patch`. The extension generates, validates, persists, restores, and conditionally emits the values described here for first-party Anthropic requests.
+This document records behavior observed in the Claude Code 2.1.284 executable and the request-state implementation in `pi-cc-patch`. The extension generates, validates, persists, restores, and conditionally emits the values described here for first-party Anthropic requests.
 
 The extension also logs Anthropic response headers so the actual header names and values exposed by pi can be verified.
 
-## Claude Code 2.1.280 behavior
+## Claude Code 2.1.284 behavior
 
 Claude Code still emits the existing billing-header fields:
 
@@ -20,6 +20,8 @@ Its billing-header builder can also emit these conditional fields:
 cc_prev_req=req_...;
 cc_prompt_id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx;
 cc_turn_origin=human;
+cc_prompt_index=1;
+cc_turn_index=1;
 ```
 
 For normal first-party Anthropic requests, the fields are constructed as follows.
@@ -50,7 +52,7 @@ A first request has no previous request ID, so this field is absent.
 
 ### `cc_turn_origin`
 
-Claude Code 2.1.280 attaches a turn origin to the latest eligible user message and carries it across model requests for the same turn. A normal interactive prompt uses:
+Claude Code 2.1.284 attaches a turn origin to the latest eligible user message and carries it across model requests for the same turn. A normal interactive prompt uses:
 
 ```text
 cc_turn_origin=human;
@@ -62,9 +64,21 @@ Other observed origin categories include `auto_continuation`, `task_notification
 ^[a-z][a-z_]{0,31}$
 ```
 
+### `cc_prompt_index` and `cc_turn_index`
+
+The pair is omitted completely when unavailable or invalid; no empty-valued fields are emitted. Its server-side billing necessity is unknown. The current pi implementation is experimental and has known lifecycle gaps documented in [TURN_POSITION_FIELDS.md](TURN_POSITION_FIELDS.md).
+
+Claude Code 2.1.284 tracks a position for each eligible turn. The first interactive human prompt uses:
+
+```text
+cc_prompt_index=1; cc_turn_index=1;
+```
+
+A human prompt increments both values. A non-human turn increments only `cc_turn_index`. Model requests caused by the same prompt, including tool-result continuations, reuse its position. The builder emits the fields together after `cc_turn_origin` only when `cc_prompt_index` is an integer from 0 through 10,000,000 and `cc_turn_index` is an integer from 1 through 10,000,000. Claude Code's internal position validation additionally requires the prompt index not to exceed the turn index.
+
 ### Other conditions
 
-All three request-attribution fields are restricted to the first-party Anthropic path using the normal Anthropic endpoint. The builder can omit them when their values are unavailable or invalid. This conditional construction does not establish whether Anthropic's billing classifier currently requires them.
+All five request-attribution fields are restricted to the first-party Anthropic path using the normal Anthropic endpoint. The builder can omit them when their values are unavailable or invalid. This conditional construction does not establish whether Anthropic's billing classifier currently requires them.
 
 ## Other billing fields
 
@@ -76,7 +90,7 @@ The JavaScript builder inserts the fixed sentinel:
 cch=00000;
 ```
 
-Claude Code 2.1.280 includes it when the provider route is first-party with an unset or `api.anthropic.com` base URL, or when the provider route is Vertex. It omits the field for routes such as Bedrock, Foundry, Mantle, and the Claude Code gateway.
+Claude Code 2.1.284 includes it when the provider route is first-party with an unset or `api.anthropic.com` base URL, or when the provider route is Vertex. It omits the field for routes such as Bedrock, Foundry, Mantle, and the Claude Code gateway.
 
 The placeholder should not be assumed to be the final value on the network. Independent runtime analysis reports that Claude Code's custom Bun `fetch` implementation recognizes `/v1/messages` requests, hashes the serialized request body, and replaces the five zeroes with a request-dependent five-character hexadecimal value before transmission. The installed JavaScript confirms the sentinel construction and routing conditions, but this native replacement was not independently reproduced during this audit.
 
@@ -84,7 +98,7 @@ The placeholder should not be assumed to be the final value on the network. Inde
 
 #### Related CCH research and implementations
 
-These sources are unofficial. Most were published around the March 2026 Claude Code source leak and may describe versions older than 2.1.280.
+These sources are unofficial. Most were published around the March 2026 Claude Code source leak and may describe versions older than 2.1.284.
 
 - [What's cch? Reverse Engineering Claude Code's Request Signing](https://a10k.co/b/reverse-engineering-claude-code-cch.html) — runtime and wire-level reverse engineering of the sentinel replacement and body hash.
 - [Claude Code's Defense in Depth](https://yage.ai/share/claude-code-defense-in-depth-en-20260401.html) — source-level discussion of native client attestation.
@@ -126,7 +140,7 @@ This describes the request's execution context, not whether the conversation hap
 When every optional field is present, the binary constructs them in this order:
 
 ```text
-x-anthropic-billing-header: cc_version={version}.{suffix}; cc_entrypoint={entrypoint}; cch=00000; cc_workload={tag}; cc_is_subagent=true; cc_prev_req={requestId}; cc_prompt_id={promptId}; cc_turn_origin={origin};
+x-anthropic-billing-header: cc_version={version}.{suffix}; cc_entrypoint={entrypoint}; cch=00000; cc_workload={tag}; cc_is_subagent=true; cc_prev_req={requestId}; cc_prompt_id={promptId}; cc_turn_origin={origin}; cc_prompt_index={promptIndex}; cc_turn_index={turnIndex};
 ```
 
 ## Pi data currently available
@@ -161,9 +175,10 @@ The log retains the latest 50 responses. Logging does not alter outgoing request
 2. Reuse it for all provider requests in that agent run.
 3. Persist it and emit it as `cc_prompt_id` on eligible first-party requests.
 4. Emit `cc_turn_origin=human` for the normal interactive pi turn and its continuations.
-5. Generate a new UUID for the next human prompt.
+5. Advance `cc_prompt_index` and `cc_turn_index` for each new human prompt, then reuse both values for its model continuations.
+6. Generate a new UUID for the next human prompt.
 
-Queued steering and follow-up prompts need explicit verification because they may begin a new agent run while sharing surrounding conversation history.
+Queued steering and follow-up prompts bypass `before_agent_start` in pi, so the current implementation misses their position and prompt-ID updates. This path must be addressed before position tracking is considered accurate.
 
 ### Request lifecycle
 
@@ -185,7 +200,11 @@ Observed state is stored with `pi.appendEntry()` using this custom entry:
   "customType": "cc-patch-request-state",
   "data": {
     "promptId": "550e8400-e29b-41d4-a716-446655440000",
-    "requestId": "req_abc123"
+    "requestId": "req_abc123",
+    "turnPosition": {
+      "promptIndex": 1,
+      "turnIndex": 1
+    }
   }
 }
 ```
@@ -195,9 +214,11 @@ Custom entries remain outside model context but participate in pi's session tree
 - during `session_start` for startup, reload, resume, fork, and clone;
 - during `session_tree` after in-file tree navigation.
 
-This makes the selected branch, rather than process-global recency, determine the next `cc_prev_req` and active `cc_prompt_id`.
+This makes the selected branch, rather than process-global recency, determine the next `cc_prev_req`, active `cc_prompt_id`, and turn position. Entries written before turn positions were introduced restore the position as unknown; the extension then omits both index fields rather than fabricating historical counts.
 
 ## Lifecycle verification
+
+The historical live checks below verify request-ID and prompt-ID behavior, not the new prompt/turn indexes. Position tracking has only automated coverage for a subset of lifecycles.
 
 Live first-party Anthropic/OAuth requests through pi confirmed:
 
@@ -216,10 +237,10 @@ Live first-party Anthropic/OAuth requests through pi confirmed:
 The implementation now emits valid request state in Claude Code's observed order:
 
 ```text
-cch=00000; cc_prev_req={requestId}; cc_prompt_id={promptId}; cc_turn_origin=human;
+cch=00000; cc_prev_req={requestId}; cc_prompt_id={promptId}; cc_turn_origin=human; cc_prompt_index={promptIndex}; cc_turn_index={turnIndex};
 ```
 
-The first request omits `cc_prev_req`. All three request-attribution fields are omitted unless the model provider is exactly `anthropic` and its base URL host is exactly `api.anthropic.com`.
+The first request omits `cc_prev_req`. All five request-attribution fields are omitted unless the model provider is exactly `anthropic` and its base URL host is exactly `api.anthropic.com`.
 
 A post-emission live test on 2026-09-04 confirmed:
 

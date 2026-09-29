@@ -31,9 +31,10 @@ export const VIRTUAL_PACKAGE_DIR = "/tmp/coding-agent";
 
 // Billing header constants (extracted from Claude Code binary)
 const BILLING_SALT = "59cf53e54c78";
-const CC_VERSION = "2.1.280";
+const CC_VERSION = "2.1.284";
 const CC_ENTRYPOINT = "cli";
 const CC_TURN_ORIGIN = "human";
+const MAX_TURN_INDEX = 10_000_000;
 
 // Session-level cache for the version suffix (reset on session_start)
 let cachedVersionSuffix: string | null = null;
@@ -42,6 +43,10 @@ let realPackageDir: string | null = null;
 export interface CcRequestState {
 	promptId: string | null;
 	requestId: string | null;
+	turnPosition: {
+		promptIndex: number;
+		turnIndex: number;
+	} | null;
 }
 
 interface SessionEntryLike {
@@ -56,7 +61,11 @@ interface ModelTarget {
 	baseUrl?: string;
 }
 
-let requestState: CcRequestState = { promptId: null, requestId: null };
+let requestState: CcRequestState = {
+	promptId: null,
+	requestId: null,
+	turnPosition: { promptIndex: 0, turnIndex: 0 },
+};
 
 /**
  * Computes the version suffix using Claude Code's algorithm.
@@ -110,6 +119,9 @@ export function buildBillingHeader(
 	if (state !== null) {
 		header += ` cc_turn_origin=${CC_TURN_ORIGIN};`;
 	}
+	if (state?.turnPosition && isValidTurnPosition(state.turnPosition)) {
+		header += ` cc_prompt_index=${state.turnPosition.promptIndex}; cc_turn_index=${state.turnPosition.turnIndex};`;
+	}
 	return header;
 }
 
@@ -121,16 +133,46 @@ export function resetVersionSuffixCache(): void {
 }
 
 export function getRequestState(): CcRequestState {
-	return { ...requestState };
+	return {
+		...requestState,
+		turnPosition: requestState.turnPosition ? { ...requestState.turnPosition } : null,
+	};
 }
 
 export function resetRequestState(): void {
-	requestState = { promptId: null, requestId: null };
+	requestState = {
+		promptId: null,
+		requestId: null,
+		turnPosition: { promptIndex: 0, turnIndex: 0 },
+	};
+}
+
+function isValidTurnPosition(value: unknown): value is NonNullable<CcRequestState["turnPosition"]> {
+	if (!value || typeof value !== "object") return false;
+	const { promptIndex, turnIndex } = value as Record<string, unknown>;
+	return (
+		typeof promptIndex === "number" &&
+		Number.isInteger(promptIndex) &&
+		promptIndex >= 0 &&
+		promptIndex <= MAX_TURN_INDEX &&
+		typeof turnIndex === "number" &&
+		Number.isInteger(turnIndex) &&
+		turnIndex >= 1 &&
+		turnIndex <= MAX_TURN_INDEX &&
+		promptIndex <= turnIndex
+	);
 }
 
 export function startPrompt(promptId: string = randomUUID()): CcRequestState {
 	if (!PROMPT_ID_PATTERN.test(promptId)) throw new Error("Invalid Claude Code prompt ID");
-	requestState = { promptId, requestId: requestState.requestId };
+	const previousPosition = requestState.turnPosition;
+	const turnPosition = previousPosition && previousPosition.turnIndex < MAX_TURN_INDEX
+		? {
+			promptIndex: previousPosition.promptIndex + 1,
+			turnIndex: previousPosition.turnIndex + 1,
+		}
+		: null;
+	requestState = { promptId, requestId: requestState.requestId, turnPosition };
 	return getRequestState();
 }
 
@@ -155,10 +197,22 @@ export function restoreRequestState(entries: SessionEntryLike[]): CcRequestState
 		const requestId = data.requestId === null || (typeof data.requestId === "string" && REQUEST_ID_PATTERN.test(data.requestId))
 			? data.requestId
 			: undefined;
-		if (promptId === undefined || requestId === undefined) continue;
+		const turnPosition = data.turnPosition === null || isValidTurnPosition(data.turnPosition)
+			? data.turnPosition
+			: data.turnPosition === undefined
+				? null
+				: undefined;
+		if (promptId === undefined || requestId === undefined || turnPosition === undefined) continue;
 
-		requestState = { promptId, requestId };
+		requestState = { promptId, requestId, turnPosition };
 		break;
+	}
+
+	if (
+		requestState.turnPosition?.turnIndex === 0 &&
+		entries.some((entry) => entry.type === "message")
+	) {
+		requestState = { ...requestState, turnPosition: null };
 	}
 	return getRequestState();
 }
