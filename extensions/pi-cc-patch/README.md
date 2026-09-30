@@ -17,7 +17,7 @@ No token swap, no SDK dependency, no proxy. Just a `before_provider_request` hoo
 The billing header uses Claude Code's exact algorithm for the version suffix:
 
 ```
-x-anthropic-billing-header: cc_version=2.1.280.{suffix}; cc_entrypoint=cli; cch=00000; [cc_prev_req=…;] [cc_prompt_id=…;] cc_turn_origin=human;
+x-anthropic-billing-header: cc_version=2.1.284.{suffix}; cc_entrypoint=cli; cch=00000; [cc_prev_req=…;] [cc_prompt_id=…;] cc_turn_origin=human;
 ```
 
 Where `{suffix}` is computed as:
@@ -27,7 +27,7 @@ suffix = sha256(SALT + chars[4,7,20] + VERSION).slice(0, 3)
 
 - **SALT**: `59cf53e54c78` (extracted from Claude Code binary)
 - **chars[4,7,20]**: Characters at positions 4, 7, 20 of the first user message (or "0" if missing)
-- **VERSION**: Audited Claude Code version (`2.1.280`)
+- **VERSION**: Audited Claude Code version (`2.1.284`)
 - **ENTRYPOINT**: Normal Claude Code CLI sessions use `cli`
 
 Claude Code 2.1.280 also supports optional billing-header fields that this extension does not emit for the normal main CLI path:

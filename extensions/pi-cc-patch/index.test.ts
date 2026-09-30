@@ -195,7 +195,7 @@ describe("buildBillingHeader", () => {
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.280.519; cc_entrypoint=cli; cch=00000; cc_turn_origin=human;"
+			"x-anthropic-billing-header: cc_version=2.1.284.8a1; cc_entrypoint=cli; cch=00000; cc_turn_origin=human;"
 		);
 	});
 
@@ -215,7 +215,7 @@ describe("buildBillingHeader", () => {
 		const messages = [{ role: "assistant", content: "Hello" }];
 		const header = buildBillingHeader(messages);
 
-		assert.match(header, /cc_version=2\.1\.280\.000/);
+		assert.match(header, /cc_version=2\.1\.284\.000/);
 	});
 
 	it("should include all required header components", () => {
@@ -223,7 +223,7 @@ describe("buildBillingHeader", () => {
 		const header = buildBillingHeader(messages);
 
 		assert.match(header, /x-anthropic-billing-header:/);
-		assert.match(header, /cc_version=2\.1\.280\.[0-9a-f]{3}/);
+		assert.match(header, /cc_version=2\.1\.284\.[0-9a-f]{3}/);
 		assert.match(header, /cc_entrypoint=cli/);
 		assert.match(header, /cch=00000/);
 		assert.match(header, /cc_turn_origin=human/);
@@ -286,7 +286,7 @@ describe("Claude Code request state", () => {
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.280.790; cc_entrypoint=cli; cch=00000; cc_prev_req=req_previous; cc_prompt_id=550e8400-e29b-41d4-a716-446655440000; cc_turn_origin=human;",
+			"x-anthropic-billing-header: cc_version=2.1.284.b93; cc_entrypoint=cli; cch=00000; cc_prev_req=req_previous; cc_prompt_id=550e8400-e29b-41d4-a716-446655440000; cc_turn_origin=human;",
 		);
 	});
 
@@ -335,7 +335,7 @@ describe("integration: verified against Claude Code", () => {
 	});
 
 	it("should match Claude Code billing header for 'What day is it?'", () => {
-		// Verified against the Claude Code CLI 2.1.280 billing-header algorithm.
+		// Verified against the Claude Code CLI 2.1.284 billing-header algorithm.
 		// First user message: "What day is it?"
 
 		const messages = [{ role: "user", content: "What day is it?" }];
@@ -343,7 +343,7 @@ describe("integration: verified against Claude Code", () => {
 
 		assert.strictEqual(
 			header,
-			"x-anthropic-billing-header: cc_version=2.1.280.519; cc_entrypoint=cli; cch=00000; cc_turn_origin=human;"
+			"x-anthropic-billing-header: cc_version=2.1.284.8a1; cc_entrypoint=cli; cch=00000; cc_turn_origin=human;"
 		);
 	});
 
@@ -517,7 +517,7 @@ describe("provider payload patching", () => {
 
 		assert.strictEqual(result, payload);
 		assert.strictEqual(payload.system.length, 2);
-		assert.match(payload.system[0].text, /^x-anthropic-billing-header: cc_version=2\.1\.280\.519/);
+		assert.match(payload.system[0].text, /^x-anthropic-billing-header: cc_version=2\.1\.284\.8a1/);
 		assert.strictEqual(payload.system[1].text, "You are operating inside a minimal coding agent harness.");
 		assert.deepStrictEqual(JSON.parse(payload.metadata.user_id), { device_id: "0", account_uuid: "", session_id: "0" });
 	});
@@ -901,7 +901,7 @@ describe("extension registration", () => {
 		assert.deepStrictEqual(ui.notify.mock.calls[0], ["cc-patch: loaded (anthropic-only)", "info"]);
 		assert.deepStrictEqual(getRequestState(), branch[0].data);
 		const header = buildBillingHeader([{ role: "user", content: "Second message" }]);
-		assert.match(header, new RegExp(`cc_version=2\\.1\\.280\\.${computeVersionSuffix("Second message")}`));
+		assert.match(header, new RegExp(`cc_version=2\\.1\\.284\\.${computeVersionSuffix("Second message")}`));
 	});
 
 	it("restores request state after session tree navigation", async () => {
