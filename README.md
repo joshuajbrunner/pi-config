@@ -26,6 +26,7 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 | `create-extension` | Create pi extensions for projects |
 | `create-skill` | Create reusable pi skills |
 | `github-issue` | Create GitHub issues using gh CLI |
+| `simplified-technical-english` | Write and review technical text in Simplified Technical English |
 | `council` | Launch an autonomous group of peer models to discuss a topic together |
 | `discuss` | Explicitly conduct a discussion with one or more peer models |
 | `implement` | Explicitly launch and supervise implementation sessions |
