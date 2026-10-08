@@ -31,7 +31,7 @@ export const VIRTUAL_PACKAGE_DIR = "/tmp/coding-agent";
 
 // Billing header constants (extracted from Claude Code binary)
 const BILLING_SALT = "59cf53e54c78";
-const CC_VERSION = "2.1.284";
+const CC_VERSION = "2.1.293";
 const CC_ENTRYPOINT = "cli";
 const CC_TURN_ORIGIN = "human";
 

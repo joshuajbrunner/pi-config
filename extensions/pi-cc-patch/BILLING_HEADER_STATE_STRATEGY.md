@@ -6,6 +6,20 @@ This document records behavior observed in the Claude Code 2.1.280 executable an
 
 The extension also logs Anthropic response headers so the actual header names and values exposed by pi can be verified.
 
+## Claude Code 2.1.293 audit
+
+Inspected executable: `/opt/homebrew/Caskroom/claude-code@latest/2.1.293/claude`.
+
+The embedded JavaScript confirms the same salt (`59cf53e54c78`), character positions (`4`, `7`, `20`), SHA-256 hash, and three-character suffix. For `What day is it?`, version `2.1.293` produces suffix `f59`.
+
+The builder retains `cc_prev_req`, `cc_prompt_id`, `cc_turn_origin`, `cc_workload`, and `cc_is_subagent`. It also retains the conditional position fields `cc_prompt_index` and `cc_turn_index`. It emits the pair only for eligible first-party requests when both indexes pass validation. Both values must be integers at most 10,000,000. The prompt index must be at least zero. The turn index must be at least one. When either value is unavailable or invalid, the builder omits both fields.
+
+The extension continues to omit the position fields. Accurate positions require complete turn history across queued human input, non-human input, provider changes, and session navigation. The client permits omission, but this inspection does not establish Anthropic's server-side requirements.
+
+The UUID validator accepts uppercase and lowercase hexadecimal characters. The extension generates lowercase UUIDs, so its existing validator covers its generated values.
+
+The JavaScript still constructs `cch=00000` for eligible first-party requests and Vertex requests. This audit does not verify native CCH replacement or actual network bytes. No live subscription-billing check accompanied this audit.
+
 ## Claude Code 2.1.280 behavior
 
 Claude Code still emits the existing billing-header fields:

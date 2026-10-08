@@ -17,7 +17,7 @@ No token swap, no SDK dependency, no proxy. Just a `before_provider_request` hoo
 The billing header uses Claude Code's exact algorithm for the version suffix:
 
 ```
-x-anthropic-billing-header: cc_version=2.1.284.{suffix}; cc_entrypoint=cli; cch=00000; [cc_prev_req=…;] [cc_prompt_id=…;] cc_turn_origin=human;
+x-anthropic-billing-header: cc_version=2.1.293.{suffix}; cc_entrypoint=cli; cch=00000; [cc_prev_req=…;] [cc_prompt_id=…;] cc_turn_origin=human;
 ```
 
 Where `{suffix}` is computed as:
@@ -27,7 +27,7 @@ suffix = sha256(SALT + chars[4,7,20] + VERSION).slice(0, 3)
 
 - **SALT**: `59cf53e54c78` (extracted from Claude Code binary)
 - **chars[4,7,20]**: Characters at positions 4, 7, 20 of the first user message (or "0" if missing)
-- **VERSION**: Audited Claude Code version (`2.1.284`)
+- **VERSION**: Audited Claude Code version (`2.1.293`)
 - **ENTRYPOINT**: Normal Claude Code CLI sessions use `cli`
 
 Claude Code 2.1.280 also supports optional billing-header fields that this extension does not emit for the normal main CLI path:
@@ -35,6 +35,12 @@ Claude Code 2.1.280 also supports optional billing-header fields that this exten
 - `cc_workload={value};` when a workload tag is set
 - `cc_is_subagent=true;` for non-main subagent sessions
 - `cch=00000;` is omitted for some non-first-party providers such as Bedrock/AWS/Mantle
+
+## Claude Code 2.1.293 audit
+
+Inspection of the installed executable confirms the existing suffix algorithm and request-attribution fields. It also confirms that `cc_prompt_index` and `cc_turn_index` remain conditional. Claude Code omits both fields when valid positions are unavailable. This extension omits them because it does not track complete turn positions. Client-side omission does not prove that Anthropic ignores these fields.
+
+For `What day is it?`, the current version suffix is `f59`. The audit covers embedded JavaScript, not a live subscription-billing check or native CCH replacement.
 
 ## Observed Claude Code 2.1.280 fields
 
