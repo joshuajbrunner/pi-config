@@ -181,11 +181,17 @@ function getSessionDataDir(sessionFile: string): string {
 	return join(sessionDir, sessionName);
 }
 
+function isDiagnosticLoggingEnabled(): boolean {
+	return process.env.PI_CC_PATCH_DEBUG === "1";
+}
+
 export async function logSystemPrompt(
 	sessionFile: string,
 	model: string,
 	system: any
 ): Promise<void> {
+	if (!isDiagnosticLoggingEnabled()) return;
+
 	const sessionDataDir = getSessionDataDir(sessionFile);
 	const logFile = join(sessionDataDir, SYSTEM_PROMPT_LOG);
 
@@ -236,6 +242,8 @@ export async function logProviderResponseHeaders(
 	status: number,
 	headers: Record<string, string>,
 ): Promise<void> {
+	if (!isDiagnosticLoggingEnabled()) return;
+
 	const sessionDataDir = getSessionDataDir(sessionFile);
 	const logFile = join(sessionDataDir, PROVIDER_RESPONSE_HEADERS_LOG);
 	let lines: string[] = [];
@@ -489,7 +497,12 @@ export default function (pi: ExtensionAPI) {
 
 			const entries = await readSystemPrompts(sessionFile);
 			if (entries.length === 0) {
-				ctx.ui.notify("No system prompts logged yet", "info");
+				ctx.ui.notify(
+					isDiagnosticLoggingEnabled()
+						? "No system prompts logged yet"
+						: "No system prompts logged. Start pi with PI_CC_PATCH_DEBUG=1 to enable diagnostic logging.",
+					"info",
+				);
 				return;
 			}
 

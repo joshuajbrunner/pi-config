@@ -4,7 +4,7 @@
 
 This document records behavior observed in the Claude Code 2.1.280 executable and the request-state implementation in `pi-cc-patch`. The extension generates, validates, persists, restores, and conditionally emits the values described here for first-party Anthropic requests.
 
-The extension also logs Anthropic response headers so the actual header names and values exposed by pi can be verified.
+When `PI_CC_PATCH_DEBUG=1` is set, the extension also logs Anthropic response headers so the actual header names and values exposed by pi can be verified. Diagnostic file logging is otherwise disabled.
 
 ## Claude Code 2.1.293 audit
 
@@ -153,7 +153,7 @@ A first-party Anthropic/OAuth request made through pi on 2026-09-04 confirmed th
 
 ## Diagnostic header log
 
-Anthropic response headers are written to:
+With `PI_CC_PATCH_DEBUG=1`, Anthropic response headers are written to:
 
 ```text
 {session-data-directory}/provider-response-headers.jsonl
@@ -165,7 +165,7 @@ For a session file named `example.jsonl`, the session data directory is the sibl
 {"timestamp":"...","status":200,"headers":{"request-id":"req_..."}}
 ```
 
-The log retains the latest 50 responses. Logging does not alter outgoing requests. Request-state persistence is handled separately through custom session entries.
+The log retains the latest 50 responses. With any other value, or when the variable is unset, provider requests do not read or write this log or the system-prompt log. Existing logs are retained. Logging does not alter outgoing requests. Request-state persistence is handled separately through custom session entries and remains enabled when diagnostic logging is disabled.
 
 ## Request-state implementation
 

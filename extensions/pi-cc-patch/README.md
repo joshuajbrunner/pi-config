@@ -54,13 +54,29 @@ The extension emits these fields for first-party Anthropic requests. A new human
 
 See [Billing Header Request-State Strategy](BILLING_HEADER_STATE_STRATEGY.md) for the observed validation rules, pi session-tree behavior, lifecycle validation, and references for future CCH investigation. The extension intentionally continues to send the existing literal `cch=00000` value.
 
-## Response Header Diagnostics
+## Opt-in Diagnostic Logging
 
-For first-party Anthropic models using `api.anthropic.com`, the extension records the response status and normalized response headers exposed by pi's `after_provider_response` event. The latest 50 entries are written beside the session data:
+Diagnostic file logging is **off by default**. To enable it for a troubleshooting session, start pi with:
+
+```bash
+PI_CC_PATCH_DEBUG=1 pi
+```
+
+Only the exact value `1` enables logging. When it is unset or has any other value, provider requests do not read, create, or rewrite either diagnostic file. Existing logs are not deleted.
+
+When enabled, the extension keeps the latest 50 entries in each file beside the session data:
 
 ```text
+{session-data-directory}/system-prompts.jsonl
 {session-data-directory}/provider-response-headers.jsonl
 ```
+
+- `system-prompts.jsonl` records the timestamp, model, and patched system prompt before each patched Anthropic/Claude-targeted request.
+- `provider-response-headers.jsonl` records the timestamp, response status, and normalized headers exposed by pi's `after_provider_response` event for first-party Anthropic models using `api.anthropic.com`.
+
+These files can contain sensitive prompts and response metadata. Enable logging only when needed. Start pi without the environment variable to stop logging.
+
+`/debug-system-prompts [limit]` can read existing prompt logs even when logging is disabled. If no logs are available, it explains how to enable logging. Request patching and request-ID tracking through custom session entries remain active regardless of this setting.
 
 For a session file named `example.jsonl`, the log is stored in the sibling `example/provider-response-headers.jsonl` path. A first-party Anthropic/OAuth request on 2026-09-04 confirmed that pi exposes a lowercase `request-id` header containing a `req_...` value. The extension validates and retains that value as session-tree state and emits it as `cc_prev_req` on the next eligible request.
 

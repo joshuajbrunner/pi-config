@@ -9,7 +9,7 @@
  * Or with Node 22+: node --experimental-strip-types --test index.test.ts
  */
 
-import { describe, it, beforeEach, vi } from "vitest";
+import { describe, it, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert";
 import { createHash } from "node:crypto";
 import { lstat, mkdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
@@ -57,6 +57,14 @@ import ccPatch, {
 	systemPromptToString,
 	virtualizePackageDir,
 } from "./index";
+
+beforeEach(() => {
+	vi.stubEnv("PI_CC_PATCH_DEBUG", undefined);
+});
+
+afterEach(() => {
+	vi.unstubAllEnvs();
+});
 
 describe("computeVersionSuffix", () => {
 	it("should compute correct suffix for 'What day is it?' (verified against Claude Code)", () => {
@@ -659,11 +667,31 @@ describe("system prompt log helpers", () => {
 });
 
 
+describe("diagnostic logging opt-in", () => {
+	it.each([undefined, "", "0", "false", "true", "yes"])(
+		"does not access diagnostic files when PI_CC_PATCH_DEBUG is %s",
+		async (value) => {
+			vi.stubEnv("PI_CC_PATCH_DEBUG", value);
+			vi.mocked(readFile).mockClear();
+			vi.mocked(mkdir).mockClear();
+			vi.mocked(writeFile).mockClear();
+
+			await logSystemPrompt("/tmp/session/test.jsonl", "claude", "system");
+			await logProviderResponseHeaders("/tmp/session/test.jsonl", 200, { "request-id": "req_test" });
+
+			assert.strictEqual(vi.mocked(readFile).mock.calls.length, 0);
+			assert.strictEqual(vi.mocked(mkdir).mock.calls.length, 0);
+			assert.strictEqual(vi.mocked(writeFile).mock.calls.length, 0);
+		},
+	);
+});
+
 describe("provider response header logging", () => {
 	const sessionFile = "/tmp/session/test-session.jsonl";
 	const logFile = "/tmp/session/test-session/provider-response-headers.jsonl";
 
 	beforeEach(() => {
+		vi.stubEnv("PI_CC_PATCH_DEBUG", "1");
 		vi.mocked(readFile).mockReset();
 		vi.mocked(mkdir).mockReset();
 		vi.mocked(writeFile).mockReset();
@@ -693,6 +721,7 @@ describe("system prompt log persistence", () => {
 	const logFile = "/tmp/session/test-session/system-prompts.jsonl";
 
 	beforeEach(() => {
+		vi.stubEnv("PI_CC_PATCH_DEBUG", "1");
 		vi.mocked(readFile).mockReset();
 		vi.mocked(mkdir).mockReset();
 		vi.mocked(writeFile).mockReset();
@@ -809,7 +838,8 @@ describe("extension registration", () => {
 		assert.strictEqual((entries[0].data as any).requestId, null);
 	});
 
-	it("patches provider requests and logs sanitized prompts", async () => {
+	it("patches provider requests and logs sanitized prompts when opted in", async () => {
+		vi.stubEnv("PI_CC_PATCH_DEBUG", "1");
 		vi.mocked(readFile).mockRejectedValue(new Error("missing"));
 		const { handlers } = createPiHarness();
 		const payload = {
@@ -830,6 +860,7 @@ describe("extension registration", () => {
 	});
 
 	it("ignores provider request logging failures", async () => {
+		vi.stubEnv("PI_CC_PATCH_DEBUG", "1");
 		vi.mocked(readFile).mockRejectedValue(new Error("missing"));
 		vi.mocked(writeFile).mockRejectedValue(new Error("nope"));
 		const { handlers } = createPiHarness();
@@ -871,9 +902,18 @@ describe("extension registration", () => {
 		};
 		await handlers.get("before_provider_request")!({ payload: continuation }, ctx);
 		assert.match(continuation.system[0].text, new RegExp(`cc_prev_req=req_first; cc_prompt_id=${promptId}; cc_turn_origin=human;$`));
+		assert.strictEqual(entries.length, 2);
+		assert.deepStrictEqual(entries[1], {
+			customType: REQUEST_STATE_ENTRY_TYPE,
+			data: { promptId, requestId: "req_first" },
+		});
+		assert.strictEqual(vi.mocked(readFile).mock.calls.length, 0);
+		assert.strictEqual(vi.mocked(mkdir).mock.calls.length, 0);
+		assert.strictEqual(vi.mocked(writeFile).mock.calls.length, 0);
 	});
 
-	it("logs and persists validated Anthropic response request IDs", async () => {
+	it("logs and persists validated Anthropic response request IDs when opted in", async () => {
+		vi.stubEnv("PI_CC_PATCH_DEBUG", "1");
 		vi.mocked(readFile).mockRejectedValue(new Error("missing"));
 		const { handlers, entries } = createPiHarness();
 		const ctx = {
@@ -944,7 +984,14 @@ describe("extension registration", () => {
 
 		vi.mocked(readFile).mockRejectedValue(new Error("missing"));
 		await command.handler("", { sessionManager: { getSessionFile: () => "/tmp/session/test.jsonl" }, ui });
-		assert.deepStrictEqual(ui.notify.mock.calls[1], ["No system prompts logged yet", "info"]);
+		assert.deepStrictEqual(ui.notify.mock.calls[1], [
+			"No system prompts logged. Start pi with PI_CC_PATCH_DEBUG=1 to enable diagnostic logging.",
+			"info",
+		]);
+
+		vi.stubEnv("PI_CC_PATCH_DEBUG", "1");
+		await command.handler("", { sessionManager: { getSessionFile: () => "/tmp/session/test.jsonl" }, ui });
+		assert.deepStrictEqual(ui.notify.mock.calls[2], ["No system prompts logged yet", "info"]);
 	});
 
 	it("debug command opens selected prompt in editor", async () => {
