@@ -16,7 +16,7 @@ Verify the installed Claude Code CLI's billing header construction against the e
    find ~/.local/share/claude/versions -maxdepth 1 -type f -o -type l | sort
    ```
 
-   If `which claude` points at the cmux wrapper, inspect `~/.local/bin/claude` and `~/.local/share/claude/versions/<version>` instead.
+   If `which claude` points at a wrapper script, inspect `~/.local/bin/claude` and `~/.local/share/claude/versions/<version>` instead.
 
 2. Search the current and previous binaries for billing-header markers.
 
