@@ -11,37 +11,45 @@ Verify the installed Claude Code CLI's billing header construction against the e
 1. Locate the Claude Code executable and version.
 
    ```bash
-   which claude
+   command -v claude
    claude --version
-   find ~/.local/share/claude/versions -maxdepth 1 -type f -o -type l | sort
+   export CLAUDE_BINARY="$(python3 -c 'from pathlib import Path; import shutil; print(Path(shutil.which("claude")).resolve())')"
+   printf '%s\n' "$CLAUDE_BINARY"
+   if [ -d "$HOME/.local/share/claude/versions" ]; then
+     find "$HOME/.local/share/claude/versions" -maxdepth 1 \( -type f -o -type l \) | sort
+   fi
    ```
 
-2. Search the current and previous binaries for billing-header markers.
+   The resolved path supports native installations and Homebrew Cask installations on Linux and macOS. Homebrew paths include `<brew-prefix>/Caskroom/claude-code@latest/<version>/claude`.
+
+2. Search the current binary for billing-header markers. Repeat for a previous binary if one is available.
 
    ```bash
-   rg -a -n "cc_version|cc_entrypoint|x-anthropic-billing-header|59cf53e54c78|cc_workload|cc_is_subagent|cc_prev_req|cc_prompt_id|cc_turn_origin" \
-     ~/.local/share/claude/versions/<version>
+   rg -a -n "cc_version|cc_entrypoint|x-anthropic-billing-header|59cf53e54c78|cc_workload|cc_is_subagent|cc_prev_req|cc_prompt_id|cc_turn_origin|cc_gateway|cc_project|cc_prev_msg|cc_prev_prompt_index|cc_prev_turn_index" \
+     "$CLAUDE_BINARY"
    ```
 
    If output is too large, use byte offsets:
 
    ```bash
-   grep -aob 'x-anthropic-billing-header\|cc_version\|cc_entrypoint\|59cf53e54c78\|cc_workload\|cc_is_subagent\|cc_prev_req\|cc_prompt_id\|cc_turn_origin' \
-     ~/.local/share/claude/versions/<version>
+   grep -aob 'x-anthropic-billing-header\|cc_version\|cc_entrypoint\|59cf53e54c78\|cc_workload\|cc_is_subagent\|cc_prev_req\|cc_prompt_id\|cc_turn_origin\|cc_gateway\|cc_project\|cc_prev_msg\|cc_prev_prompt_index\|cc_prev_turn_index' \
+     "$CLAUDE_BINARY"
    ```
 
 3. Extract nearby deminified JavaScript around the relevant offsets.
 
    ```bash
    python3 - <<'PY'
+   import os
    from pathlib import Path
-   version = '<version>'
-   path = Path.home()/'.local/share/claude/versions'/version
+   path = Path(os.environ['CLAUDE_BINARY'])
    text = path.read_bytes().decode('utf-8', 'ignore')
-   for term in ['function er_', 'x-anthropic-billing-header', '59cf53e54c78']:
-       i = text.find(term)
-       print('\n---', term, i, '---')
-       print(text[max(0, i-500):i+1500] if i >= 0 else 'not found')
+   for term in ['x-anthropic-billing-header: cc_version', '59cf53e54c78', 'cc_prev_req', 'cc_prev_msg']:
+       start = 0
+       while (i := text.find(term, start)) >= 0:
+           print('\n---', term, i, '---')
+           print(text[max(0, i-1500):i+3000])
+           start = i + len(term)
    PY
    ```
 
@@ -57,7 +65,9 @@ Verify the installed Claude Code CLI's billing header construction against the e
    - Optional `cc_workload=...;` may appear when a workload is set.
    - Optional `cc_is_subagent=true;` may appear for non-main subagent sessions.
    - First-party requests may include validated request-attribution fields in this order: `cc_prev_req`, `cc_prompt_id`, then `cc_turn_origin`.
-   - Normal interactive human turns use `cc_turn_origin=human;`; verify the accepted origin pattern and any new categories.
+   - Normal interactive human turns use `cc_turn_origin=human;`. Verify the accepted origin pattern and any new categories.
+   - Verify the conditions and order for optional gateway, project, and pre-compaction fields: `cc_gateway`, `cc_project`, `cc_project_src`, `cc_prev_msg`, `cc_prev_prompt_index`, and `cc_prev_turn_index`.
+   - Do not add optional fields unless the extension can track the corresponding state accurately.
 
 5. Compute expected suffixes for test fixtures.
 
@@ -78,13 +88,15 @@ Verify the installed Claude Code CLI's billing header construction against the e
 
    - `extensions/pi-cc-patch/index.ts`: update `CC_VERSION`, and only change algorithm constants if the audit proves they changed.
    - `extensions/pi-cc-patch/README.md`: update example version/header text.
-   - `extensions/pi-cc-patch/index.test.ts`: update default-version header expectations. Keep explicit historical-version tests if they are intentionally checking algorithm stability.
+   - `extensions/pi-cc-patch/index.test.ts`: update default-version header expectations. Keep explicit historical-version tests that check algorithm stability.
+   - `extensions/pi-cc-patch/BILLING_HEADER_STATE_STRATEGY.md`: record the executable path, optional fields, and audit limits.
 
 7. Run the tests for this project.
 
    ```bash
-   cd ~/Projects/pi-config
+   # Run from the repository root.
    npm test -- --run extensions/pi-cc-patch/index.test.ts
+   npm test
    ```
 
 ## Reporting

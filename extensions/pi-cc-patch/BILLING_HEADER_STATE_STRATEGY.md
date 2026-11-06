@@ -6,6 +6,27 @@ This document records behavior observed in the Claude Code 2.1.280 executable an
 
 When `PI_CC_PATCH_DEBUG=1` is set, the extension also logs Anthropic response headers so the actual header names and values exposed by pi can be verified. Diagnostic file logging is otherwise disabled.
 
+## Claude Code 2.1.318 audit
+
+Inspected executable: `/home/linuxbrew/.linuxbrew/Caskroom/claude-code@latest/2.1.318/claude`.
+
+The embedded JavaScript retains the salt, sample positions, hash, and three-character suffix from the previous audit. Version `2.1.318` produces suffix `6cf` for `What day is it?` and `41c` for `Hello`.
+
+The existing request-attribution fields retain their order and validation rules. The builder still accepts turn origins that match `^[a-z][a-z_]{0,31}$`. The conditional turn-position fields and `cch=00000` construction remain unchanged.
+
+The builder also supports these conditional fields after the current turn-position fields:
+
+1. `cc_gateway` for gateway attribution.
+2. `cc_project` and `cc_project_src` for project attribution.
+3. `cc_prev_msg` for the message ID of the response before compaction.
+4. `cc_prev_prompt_index` and `cc_prev_turn_index` for the turn position of that response.
+
+The pre-compaction message ID must match `^msg_[A-Za-z0-9_]{1,64}$`. The pre-compaction position pair uses the same integer limits as the current position pair. These pre-compaction fields require an eligible first-party request.
+
+The extension omits these optional fields because it does not track the corresponding state. This inspection does not establish server-side requirements for these fields.
+
+Only the current executable was available. The comparison uses the previous audit below, not a previous executable. This audit does not verify native CCH replacement, actual network bytes, or live subscription billing.
+
 ## Claude Code 2.1.293 audit
 
 Inspected executable: `/opt/homebrew/Caskroom/claude-code@latest/2.1.293/claude`.
