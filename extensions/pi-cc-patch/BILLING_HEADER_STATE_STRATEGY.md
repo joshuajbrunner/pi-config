@@ -6,6 +6,20 @@ This document records behavior observed in the Claude Code 2.1.280 executable an
 
 When `PI_CC_PATCH_DEBUG=1` is set, the extension also logs Anthropic response headers so the actual header names and values exposed by pi can be verified. Diagnostic file logging is otherwise disabled.
 
+## Claude Code 2.1.322 audit
+
+Inspected executable: `/home/linuxbrew/.linuxbrew/Caskroom/claude-code@latest/2.1.322/claude`.
+
+The embedded JavaScript retains salt `59cf53e54c78`, sample positions `4`, `7`, and `20`, SHA-256, and the three-character suffix. Version `2.1.322` produces suffix `90c` for `What day is it?`, `dc6` for `Hello`, and `808` for `Second message`.
+
+The existing request-attribution fields retain their order and validation rules. The builder accepts turn origins that match `^[a-z][a-z_]{0,31}$`. Normal interactive CLI sessions still use entrypoint `cli`. The builder retains the conditional `cch=00000`, workload, subagent, current-position, gateway, project, and pre-compaction fields.
+
+The builder also supports `cc_dispatch_entrypoint` after `cc_prev_turn_index`. It emits this field only for an eligible first-party request when `CLAUDE_CODE_SESSION_KIND` equals `bg`. The value comes from `CLAUDE_BG_DISPATCH_ENTRYPOINT` and must equal `claude-vscode`, `claude-desktop`, or `claude-desktop-3p`.
+
+Gateway attribution requires the gateway route or recognized gateway credentials and excludes invalid or protected destinations. Project attribution requires a valid tagged project ID and a recognized source. It also requires a first-party endpoint without a Unix socket, remote mode, or attribution opt-out. Pre-compaction fields retain the message-ID and paired-position validation from the previous audit.
+
+The extension continues to omit these optional fields because it does not track the corresponding state. Only the current executable was available. The comparison uses the previous audit below, not a previous executable. This audit does not verify native CCH replacement, actual network bytes, server-side field requirements, or live subscription billing.
+
 ## Claude Code 2.1.318 audit
 
 Inspected executable: `/home/linuxbrew/.linuxbrew/Caskroom/claude-code@latest/2.1.318/claude`.
