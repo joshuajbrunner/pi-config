@@ -22,44 +22,33 @@ Note: `/reload` only reloads local extensions. For git-installed packages, you m
 
 | Skill | Description |
 |-------|-------------|
+| `agentsview` | Search recorded agent history for past decisions and instructions |
 | `brave-search` | Web search and content extraction via Brave Search API |
-| `create-extension` | Create pi extensions for projects |
-| `create-skill` | Create reusable pi skills |
+| `bro` | Restate the last message in plain language |
+| `eli5` | Re-explain a topic for a beginner |
 | `github-issue` | Create GitHub issues using gh CLI |
+| `grill-agent` | Present a plan or design for the user to stress-test |
+| `grill-me` | Interview the user to stress-test their plan or design |
+| `handoff` | Write a handoff document for another session to continue the work |
+| `show-me` | Explain visually with diagrams, code sketches, and HTML artifacts |
 | `simplified-technical-english` | Write and review technical text in Simplified Technical English |
-| `council` | Launch an autonomous group of peer models to discuss a topic together |
-| `discuss` | Explicitly conduct a discussion with one or more peer models |
-| `implement` | Explicitly launch and supervise implementation sessions |
-| `research` | Explicitly launch sessions for focused research |
-| `review` | Explicitly launch one or more review sessions |
-| `terminal-task` | Explicitly run a server or long-running command in Herdr |
-| `implement-task` | Implement tasks from a plan's TASKS.md file |
-| `plan-to-tasks` | Decompose plans into actionable tasks |
-| `write-plan` | Interview and document features as structured plans |
 
 ## Extensions
 
 | Extension | Description |
 |-----------|-------------|
 | `pi-cc-patch` | Patches requests for Claude Pro/Max subscription compatibility |
-| `policy-self-heal` | Detects provider policy false-positive errors and queues a safe recovery prompt |
-| `session-tools` | Save session summaries and browse/resume sessions with summary previews |
 
 ### Commands
 
 | Command | Description |
 |---------|-------------|
 | `/debug-system-prompts` | View logged system prompts for the current session |
-| `/policy-self-heal` | Manage policy error self-healing and inspect the last detected event |
-| `/summarize [instruction]` | Summarize the current session and save it beside the session JSONL |
-| `/session-browser [all]` | Browse sessions with latest saved summary previews and resume the selected session |
 
 ## Usage
 
 Skills are available when the package is installed. Reference them with
-`/skill:<name>` or let pi load them based on task context. The `council`,
-`implement`, `research`, `review`, `discuss`, and `terminal-task` orchestration
-skills are manual-only and must be invoked explicitly with `/skill:<name>`.
+`/skill:<name>` or let pi load them based on task context.
 
 ## Installed third-party packages
 
